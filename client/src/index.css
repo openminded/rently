@@ -1,0 +1,16 @@
+@import "tailwindcss";
+
+@theme {
+  --color-primary: #111827;
+  /* Gray 900 */
+  --color-secondary: #4B5563;
+  /* Gray 600 */
+}
+
+/* Custom Base Styles */
+:root {
+  font-family: 'Inter', sans-serif;
+  background-color: #F9FAFB;
+  /* Gray 50 */
+  color: #111827;
+}

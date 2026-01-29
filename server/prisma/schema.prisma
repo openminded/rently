@@ -1,0 +1,219 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+// User role enum (Optional later)
+enum Role {
+  ADMIN
+  STAFF
+}
+
+model User {
+  id        Int      @id @default(autoincrement())
+  username  String   @unique
+  password  String
+  role      Role     @default(STAFF)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Customer {
+  id                  Int           @id @default(autoincrement())
+  name                String
+  phone               String        @unique
+  address             String?
+  identityCardNumber  String?       @unique // KTP
+  createdAt           DateTime      @default(now())
+  updatedAt           DateTime      @updatedAt
+  transactions        Transaction[]
+}
+
+model Category {
+  id        Int      @id @default(autoincrement())
+  name      String   @unique // e.g., Kebaya, Jas
+  items     Item[]
+}
+
+model Brand {
+  id    Int    @id @default(autoincrement())
+  name  String @unique // e.g., Zara, H&M
+  items Item[]
+}
+
+model Item {
+  id          Int            @id @default(autoincrement())
+  name        String
+  categoryId  Int
+  category    Category       @relation(fields: [categoryId], references: [id])
+  brandId     Int
+  brand       Brand          @relation(fields: [brandId], references: [id])
+  rentalPrice Float
+  description String?
+  images      ItemImage[]
+  variants    ItemVariant[]
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+}
+
+model ItemImage {
+  id        Int      @id @default(autoincrement())
+  itemId    Int
+  item      Item     @relation(fields: [itemId], references: [id], onDelete: Cascade)
+  url       String   // Relative URL e.g. /uploads/image.jpg
+  isPrimary Boolean  @default(false)
+  createdAt DateTime @default(now())
+}
+
+model Color {
+  id       Int           @id @default(autoincrement())
+  name     String        @unique // e.g., Merah, Putih
+  hexCode  String?
+  variants ItemVariant[]
+}
+
+model Size {
+  id       Int           @id @default(autoincrement())
+  name     String        @unique // e.g., S, M, L, XL
+  variants ItemVariant[]
+}
+
+model ItemVariant {
+  id                Int       @id @default(autoincrement())
+  itemId            Int
+  item              Item      @relation(fields: [itemId], references: [id])
+  sizeId            Int
+  size              Size      @relation(fields: [sizeId], references: [id])
+  colorId           Int
+  color             Color     @relation(fields: [colorId], references: [id])
+  
+  instances         ItemInstance[]
+
+  @@unique([itemId, sizeId, colorId])
+}
+
+enum ItemStatus {
+  AVAILABLE
+  RENTED
+  IN_LAUNDRY
+  NOT_READY // Damaged, Lost, etc.
+}
+
+model ItemInstance {
+  sku               String            @id // Unique Barcode/SKU
+  itemVariantId     Int
+  itemVariant       ItemVariant       @relation(fields: [itemVariantId], references: [id])
+  status            ItemStatus        @default(AVAILABLE)
+  
+  transactionItems  TransactionItem[]
+  laundryLogs       LaundryLog[]
+}
+
+enum TransactionStatus {
+  BOOKED          // Initial booking
+  WAITING_PICKUP  // Ready for pickup (H-1)
+  RENTED          // Active rental (Picked up)
+  RETURNED        // Items returned (but maybe fines unpaid)
+  COMPLETED       // Fully done
+  CANCELLED
+  EXPIRED         // Valid Booking but never picked up
+}
+
+enum TransactionType {
+  BOOKING
+  IMMEDIATE
+}
+
+enum PaymentStatus {
+  UNPAID
+  PARTIAL
+  PAID
+}
+
+model Transaction {
+  id               Int               @id @default(autoincrement())
+  type             TransactionType   @default(BOOKING)
+  customerId       Int
+  customer         Customer          @relation(fields: [customerId], references: [id])
+  bookingDate      DateTime          @default(now())
+  pickupDate       DateTime
+  returnPlanDate   DateTime
+  actualReturnDate DateTime?
+  status           TransactionStatus @default(BOOKED)
+  totalAmount      Float
+  paidAmount       Float             @default(0)
+  paymentStatus    PaymentStatus     @default(UNPAID)
+  
+  items            TransactionItem[]
+  payments         Payment[]
+  fines            Fine[]
+  
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
+}
+
+model TransactionItem {
+  id            Int         @id @default(autoincrement())
+  transactionId Int
+  transaction   Transaction @relation(fields: [transactionId], references: [id])
+  itemInstanceSku String
+  itemInstance  ItemInstance @relation(fields: [itemInstanceSku], references: [sku])
+  priceAtRental Float
+}
+
+model PaymentMethod {
+  id       Int       @id @default(autoincrement())
+  name     String    @unique // e.g., Transfer BCA, Cash
+  account  String?   // Rekening number
+  payments Payment[]
+}
+
+model Payment {
+  id              Int           @id @default(autoincrement())
+  transactionId   Int
+  transaction     Transaction   @relation(fields: [transactionId], references: [id])
+  amount          Float
+  paymentMethodId Int
+  paymentMethod   PaymentMethod @relation(fields: [paymentMethodId], references: [id])
+  date            DateTime      @default(now())
+  note            String?
+}
+
+model ViolationType {
+  id          Int     @id @default(autoincrement())
+  name        String  @unique // e.g. Late Return, Stain
+  defaultFine Float   @default(0)
+  fines       Fine[]
+}
+
+model Fine {
+  id              Int           @id @default(autoincrement())
+  transactionId   Int
+  transaction     Transaction   @relation(fields: [transactionId], references: [id])
+  violationTypeId Int
+  violationType   ViolationType @relation(fields: [violationTypeId], references: [id])
+  amount          Float
+  note            String?
+  createdAt       DateTime      @default(now())
+}
+
+model LaundryLog {
+  id                 Int         @id @default(autoincrement())
+  itemInstanceSku    String
+  itemInstance       ItemInstance @relation(fields: [itemInstanceSku], references: [sku])
+  sentDate           DateTime    @default(now())
+  expectedReturnDate DateTime?
+  receivedDate       DateTime?
+  status             String      @default("IN_LAUNDRY") // IN_LAUNDRY, COMPLETED
+}
+
+model AppSetting {
+  id        Int    @id @default(autoincrement())
+  key       String @unique
+  value     String
+  description String?
+}
