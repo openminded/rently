@@ -28,6 +28,7 @@ router.get('/', async (req, res) => {
 router.post('/:id/pay', transactionController.addPayment);
 router.post('/:id/pickup', transactionController.pickup);
 router.post('/:id/return', transactionController.returnItems);
+router.put('/:id/invalid', transactionController.markInvalid);
 
 // Explicitly define getById
 router.get('/:id', async (req, res) => {

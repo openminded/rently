@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, Search, Trash2, X, Save } from 'lucide-react';
-import Table from '../../components/Table';
+import { Plus, Trash2, X, Save, Edit2 } from 'lucide-react';
+import { DataTable, type Column } from '../../components/common/DataTable';
+import { useAuth } from '../../context/AuthContext';
 
 const API_BASE = 'http://localhost:3000/api/masters';
 
@@ -20,9 +21,9 @@ interface MasterGenericProps {
 }
 
 export default function MasterGenericPage({ title, description, endpoint, columns, fields }: MasterGenericProps) {
+    const { hasRole, token } = useAuth();
     const [data, setData] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
-    const [search, setSearch] = useState('');
     const [selectedIds, setSelectedIds] = useState<number[]>([]);
 
     // Modal State
@@ -30,13 +31,17 @@ export default function MasterGenericPage({ title, description, endpoint, column
     const [currentItem, setCurrentItem] = useState<any>(null);
 
     useEffect(() => {
-        fetchData();
-    }, [endpoint]);
+        if (token) {
+            fetchData();
+        }
+    }, [endpoint, token]);
 
     const fetchData = async () => {
         setLoading(true);
         try {
-            const res = await fetch(`${API_BASE}/${endpoint}`);
+            const res = await fetch(`${API_BASE}/${endpoint}`, {
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
             const json = await res.json();
             setData(Array.isArray(json) ? json : []);
         } catch (e) {
@@ -49,16 +54,9 @@ export default function MasterGenericPage({ title, description, endpoint, column
     const handleSave = async (e: React.FormEvent) => {
         e.preventDefault();
         const formData = new FormData(e.target as HTMLFormElement);
-        const payload: any = {};
 
-        fields.forEach(f => {
-            let value = formData.get(f.name);
-            if (f.type === 'number') {
-                payload[f.name] = Number(value);
-            } else {
-                payload[f.name] = value;
-            }
-        });
+        // Check if we need to send as FormData (Multipart) or JSON
+        const hasFile = fields.some(f => f.type === 'file');
 
         try {
             const url = currentItem
@@ -67,26 +65,57 @@ export default function MasterGenericPage({ title, description, endpoint, column
 
             const method = currentItem ? 'PUT' : 'POST';
 
+            let body: any;
+            let headers: any = {
+                'Authorization': `Bearer ${token}`
+            };
+
+            if (hasFile && !currentItem) {
+                // For Create with File, send FormData directly
+                body = formData;
+                // Content-Type header should NOT be set manually for FormData
+            } else {
+                // JSON Mode (Default or Edit)
+                const payload: any = {};
+                fields.forEach(f => {
+                    if (f.type === 'file') return; // Skip file in JSON payload
+                    let value = formData.get(f.name);
+                    if (f.type === 'number') {
+                        payload[f.name] = Number(value);
+                    } else {
+                        payload[f.name] = value;
+                    }
+                });
+                body = JSON.stringify(payload);
+                headers['Content-Type'] = 'application/json';
+            }
+
             const res = await fetch(url, {
                 method,
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(payload)
+                headers,
+                body
             });
 
-            if (!res.ok) throw new Error('Failed to save');
+            if (!res.ok) {
+                const err = await res.json();
+                throw new Error(err.error || 'Failed to save');
+            }
 
             setIsModalOpen(false);
             fetchData();
-        } catch (e) {
+        } catch (e: any) {
             console.error(e);
-            alert('Failed to save item');
+            alert(e.message || 'Failed to save item');
         }
     };
 
     const handleDelete = async (item: any) => {
         if (!confirm(`Delete ${item.name || 'item'}?`)) return;
         try {
-            await fetch(`${API_BASE}/${endpoint}/${item.id}`, { method: 'DELETE' });
+            await fetch(`${API_BASE}/${endpoint}/${item.id}`, {
+                method: 'DELETE',
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
             fetchData();
         } catch (e) { console.error(e); }
     };
@@ -95,17 +124,71 @@ export default function MasterGenericPage({ title, description, endpoint, column
         if (!confirm(`Delete ${selectedIds.length} items?`)) return;
         // Sequential for simplicity, ideally Promise.all
         for (const id of selectedIds) {
-            await fetch(`${API_BASE}/${endpoint}/${id}`, { method: 'DELETE' });
+            await fetch(`${API_BASE}/${endpoint}/${id}`, {
+                method: 'DELETE',
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
         }
         setSelectedIds([]);
         fetchData();
     };
 
-    const filteredData = data.filter(d =>
-        Object.values(d).some(val =>
-            String(val).toLowerCase().includes(search.toLowerCase())
-        )
+    // Construct Columns
+    const dtColumns: Column<any>[] = [
+        {
+            accessorKey: 'select',
+            className: "w-10",
+            header: (
+                <input
+                    type="checkbox"
+                    checked={data.length > 0 && selectedIds.length === data.length}
+                    onChange={(e) => {
+                        if (e.target.checked) setSelectedIds(data.map(d => d.id));
+                        else setSelectedIds([]);
+                    }}
+                    className="rounded border-gray-300"
+                />
+            ),
+            cell: (row) => (
+                <input
+                    type="checkbox"
+                    checked={selectedIds.includes(row.id)}
+                    onChange={(e) => {
+                        if (e.target.checked) setSelectedIds([...selectedIds, row.id]);
+                        else setSelectedIds(selectedIds.filter(id => id !== row.id));
+                    }}
+                    className="rounded border-gray-300"
+                />
+            )
+        },
+        ...columns.map(col => ({
+            header: col.label,
+            accessorKey: col.key,
+            sortable: true,
+            cell: col.render
+        }))
+    ];
+
+    const actions = (row: any) => (
+        <div className="flex items-center justify-end gap-2">
+            <button
+                onClick={(e) => { e.stopPropagation(); setCurrentItem(row); setIsModalOpen(true); }}
+                className="p-1.5 text-blue-600 hover:bg-blue-50 rounded transition-colors"
+            >
+                <Edit2 size={16} />
+            </button>
+            {hasRole(['SUPERADMIN', 'OWNER', 'SUPERVISOR']) && (
+                <button
+                    onClick={(e) => { e.stopPropagation(); handleDelete(row); }}
+                    className="p-1.5 text-red-600 hover:bg-red-50 rounded transition-colors"
+                >
+                    <Trash2 size={16} />
+                </button>
+            )}
+        </div>
     );
+
+    const searchKeys = columns.map(c => c.key);
 
     return (
         <div className="space-y-6">
@@ -122,32 +205,24 @@ export default function MasterGenericPage({ title, description, endpoint, column
                 </button>
             </div>
 
-            <div className="bg-white p-4 rounded-xl border border-gray-100 shadow-sm flex items-center gap-4">
-                <div className="relative flex-1">
-                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
-                    <input
-                        value={search}
-                        onChange={(e) => setSearch(e.target.value)}
-                        placeholder={`Search ${title}...`}
-                        className="w-full pl-10 pr-4 py-2 rounded-lg border border-gray-200 outline-none focus:border-blue-500 transition-colors"
-                    />
-                </div>
-                {selectedIds.length > 0 && (
-                    <button onClick={handleDeleteSelected} className="flex items-center gap-2 text-red-600 bg-red-50 px-4 py-2 rounded-lg hover:bg-red-100 transition-colors">
-                        <Trash2 size={18} /> Delete ({selectedIds.length})
-                    </button>
-                )}
-            </div>
-
             {loading ? (
                 <div className="text-center py-10 text-gray-400">Loading...</div>
             ) : (
-                <Table
-                    data={filteredData}
-                    columns={columns}
-                    onEdit={(item) => { setCurrentItem(item); setIsModalOpen(true); }}
-                    onDelete={handleDelete}
-                    onSelectionChange={setSelectedIds}
+                <DataTable
+                    data={data}
+                    columns={dtColumns}
+                    searchKeys={searchKeys}
+                    actions={actions}
+                    filterSlot={
+                        selectedIds.length > 0 && hasRole(['SUPERADMIN', 'OWNER', 'SUPERVISOR']) ? (
+                            <button
+                                onClick={handleDeleteSelected}
+                                className="flex items-center gap-2 text-red-600 bg-red-50 px-3 py-2 rounded-lg hover:bg-red-100 transition-colors text-sm font-medium"
+                            >
+                                <Trash2 size={16} /> Delete ({selectedIds.length})
+                            </button>
+                        ) : null
+                    }
                 />
             )}
 
@@ -163,14 +238,24 @@ export default function MasterGenericPage({ title, description, endpoint, column
                             {fields.map(f => (
                                 <div key={f.name}>
                                     <label className="block text-sm font-medium text-gray-700 mb-1">{f.label}</label>
-                                    <input
-                                        name={f.name}
-                                        type={f.type || 'text'}
-                                        defaultValue={currentItem ? currentItem[f.name] : ''}
-                                        className="w-full p-2 border border-gray-300 rounded-lg outline-none focus:border-blue-500 disabled:bg-gray-100"
-                                        required={f.required}
-                                        step={f.type === 'number' ? "0.01" : undefined}
-                                    />
+                                    {f.type === 'file' ? (
+                                        <input
+                                            name={f.name}
+                                            type="file"
+                                            accept="image/*"
+                                            className="w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"
+                                            required={f.required && !currentItem} // Required only on create
+                                        />
+                                    ) : (
+                                        <input
+                                            name={f.name}
+                                            type={f.type || 'text'}
+                                            defaultValue={currentItem ? currentItem[f.name] : ''}
+                                            className="w-full p-2 border border-gray-300 rounded-lg outline-none focus:border-blue-500 disabled:bg-gray-100"
+                                            required={f.required}
+                                            step={f.type === 'number' ? "0.01" : undefined}
+                                        />
+                                    )}
                                 </div>
                             ))}
                             <div className="flex justify-end gap-3 pt-4">

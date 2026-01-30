@@ -1,18 +1,23 @@
 import React, { useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
+import { useAuth } from '../context/AuthContext';
 
 const API_URL = 'http://localhost:3000/api';
 
 export default function Invoice() {
+    const { token } = useAuth();
     const { id } = useParams();
     const [transaction, setTransaction] = useState<any>(null);
     const [loading, setLoading] = useState(true);
     const [isThermal, setIsThermal] = useState(false);
 
     useEffect(() => {
+        if (!token) return;
         const fetchTransaction = async () => {
             try {
-                const res = await fetch(`${API_URL}/transactions/${id}`);
+                const res = await fetch(`${API_URL}/transactions/${id}`, {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
                 if (res.ok) {
                     const data = await res.json();
                     setTransaction(data);
@@ -28,7 +33,7 @@ export default function Invoice() {
             }
         };
         fetchTransaction();
-    }, [id]);
+    }, [id, token]);
 
     if (loading) return <div>Loading Invoice...</div>;
     if (!transaction) return <div>Transaction not found</div>;

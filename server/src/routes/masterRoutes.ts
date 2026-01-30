@@ -45,4 +45,10 @@ router.post('/customers', masterController.customers.create);
 router.put('/customers/:id', masterController.customers.update);
 router.delete('/customers/:id', masterController.customers.delete);
 
+// Laundry Partners
+router.get('/laundry-partners', masterController.laundryPartners.getAll);
+router.post('/laundry-partners', masterController.laundryPartners.create);
+router.put('/laundry-partners/:id', masterController.laundryPartners.update);
+router.delete('/laundry-partners/:id', masterController.laundryPartners.delete);
+
 export default router;

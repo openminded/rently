@@ -1,13 +1,16 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, Search, Filter, Box, AlertCircle, X, Save, Eye, Edit2 } from 'lucide-react';
+import { Plus, Box, X, Save, Eye, Edit2 } from 'lucide-react';
+import { DataTable, type Column } from '../components/common/DataTable';
 import ProductDetail from '../components/ProductDetail';
 
 const API_URL = 'http://localhost:3000/api';
 
+import { useAuth } from '../context/AuthContext';
+
 export default function Inventory() {
+    const { token } = useAuth();
     const [items, setItems] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
-    const [search, setSearch] = useState('');
 
     // Master Data helpers
     const [categories, setCategories] = useState<any[]>([]);
@@ -34,13 +37,17 @@ export default function Inventory() {
     const [localVariants, setLocalVariants] = useState<any[]>([]);
 
     useEffect(() => {
-        fetchItems();
-        fetchMasters();
-    }, []);
+        if (token) {
+            fetchItems();
+            fetchMasters();
+        }
+    }, [token]);
 
     const fetchItems = async () => {
         try {
-            const res = await fetch(`${API_URL}/items`);
+            const res = await fetch(`${API_URL}/items`, {
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
             const data = await res.json();
             setItems(Array.isArray(data) ? data : []);
             setLoading(false);
@@ -52,11 +59,12 @@ export default function Inventory() {
 
     const fetchMasters = async () => {
         try {
+            const headers = { 'Authorization': `Bearer ${token}` };
             const [catRes, brandRes, sizeRes, colorRes] = await Promise.all([
-                fetch(`${API_URL}/masters/categories`),
-                fetch(`${API_URL}/masters/brands`),
-                fetch(`${API_URL}/masters/sizes`),
-                fetch(`${API_URL}/masters/colors`)
+                fetch(`${API_URL}/masters/categories`, { headers }),
+                fetch(`${API_URL}/masters/brands`, { headers }),
+                fetch(`${API_URL}/masters/sizes`, { headers }),
+                fetch(`${API_URL}/masters/colors`, { headers })
             ]);
             setCategories(await catRes.json());
             setBrands(await brandRes.json());
@@ -312,7 +320,74 @@ export default function Inventory() {
         }
     };
 
-    const filteredItems = items.filter(i => i.name.toLowerCase().includes(search.toLowerCase()));
+    // Filter State
+    const [selectedCategory, setSelectedCategory] = useState('');
+    const [selectedBrand, setSelectedBrand] = useState('');
+
+    const columns: Column<any>[] = [
+        {
+            header: 'Image',
+            accessorKey: 'images',
+            className: 'w-20',
+            cell: (item) => (
+                <div className="w-12 h-12 bg-gray-50 rounded-lg overflow-hidden border border-gray-100 flex items-center justify-center">
+                    {item.images && item.images.length > 0 ? (
+                        <img src={`http://localhost:3000${item.images[0].url}`} alt={item.name} className="w-full h-full object-cover" />
+                    ) : (
+                        <Box size={16} className="text-gray-400" />
+                    )}
+                </div>
+            )
+        },
+        {
+            header: 'Item',
+            accessorKey: 'name',
+            sortable: true,
+            cell: (item) => (
+                <div>
+                    <h3 className="font-bold text-gray-900">{item.name}</h3>
+                    <div className="flex items-center gap-2 mt-1">
+                        <span className="text-[10px] bg-gray-100 px-2 py-0.5 rounded text-gray-600">{item.category?.name || 'No Cat'}</span>
+                        <span className="text-[10px] bg-gray-100 px-2 py-0.5 rounded text-gray-600">{item.brand?.name || 'No Brand'}</span>
+                    </div>
+                </div>
+            )
+        },
+        {
+            header: 'Rental Price',
+            accessorKey: 'rentalPrice',
+            sortable: true,
+            cell: (item) => <span className="font-medium">Rp {item.rentalPrice.toLocaleString()}</span>
+        },
+        {
+            header: 'Variants',
+            accessorKey: 'variants',
+            cell: (item) => (
+                <div className="flex items-center gap-1 text-xs text-gray-500">
+                    <Box size={14} />
+                    <span>{item.variants?.length || 0}</span>
+                </div>
+            )
+        }
+    ];
+
+    const actionColumn = (item: any) => (
+        <div className="flex justify-end gap-2">
+            <button onClick={(e) => { e.stopPropagation(); openEditModal(item); }} className="p-2 text-gray-600 hover:bg-gray-100 rounded-lg" title="Edit">
+                <Edit2 size={16} />
+            </button>
+            <button onClick={(e) => { e.stopPropagation(); openDetailModal(item); }} className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg" title="View Details">
+                <Eye size={16} />
+            </button>
+        </div>
+    );
+
+    // Apply Filters (Category/Brand)
+    const filteredItems = items.filter(item => {
+        if (selectedCategory && item.categoryId != selectedCategory) return false;
+        if (selectedBrand && item.brandId != selectedBrand) return false;
+        return true;
+    });
 
     return (
         <div className="space-y-6">
@@ -329,72 +404,35 @@ export default function Inventory() {
                 </button>
             </div>
 
-            <div className="flex gap-4">
-                <div className="flex-1 bg-white p-4 rounded-xl border border-gray-100 shadow-sm flex items-center gap-4">
-                    <Search className="text-gray-400" size={18} />
-                    <input
-                        value={search}
-                        onChange={(e) => setSearch(e.target.value)}
-                        placeholder="Search inventory by name..."
-                        className="flex-1 outline-none"
-                    />
-                </div>
-                <button className="bg-white px-4 py-2 rounded-xl border border-gray-100 shadow-sm flex items-center gap-2 hover:bg-gray-50">
-                    <Filter size={18} /> Filter
-                </button>
-            </div>
-
             {loading ? (
                 <div className="text-center py-20 text-gray-400">Loading Inventory...</div>
             ) : (
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                    {filteredItems.map(item => (
-                        <div key={item.id} className="bg-white rounded-xl border border-gray-100 shadow-sm hover:shadow-md transition-shadow p-5 group cursor-pointer" onClick={() => openDetailModal(item)}>
-                            <div className="flex justify-between items-start mb-4">
-                                <div className="flex gap-4">
-                                    {/* Image Thumbnail */}
-                                    <div className="w-16 h-16 bg-gray-50 rounded-lg flex-shrink-0 overflow-hidden border border-gray-100 relative">
-                                        {item.images && item.images.length > 0 ? (
-                                            <img src={`http://localhost:3000${item.images[0].url}`} alt={item.name} className="w-full h-full object-cover" />
-                                        ) : (
-                                            <div className="w-full h-full flex items-center justify-center text-gray-400">
-                                                <Box size={20} />
-                                            </div>
-                                        )}
-                                    </div>
-                                    <div>
-                                        <h3 className="font-bold text-lg text-gray-900 line-clamp-1">{item.name}</h3>
-                                        <div className="flex items-center gap-2 mt-1">
-                                            <span className="text-xs bg-gray-100 px-2 py-1 rounded text-gray-600">{item.category?.name || 'No Category'}</span>
-                                            <span className="text-xs bg-gray-100 px-2 py-1 rounded text-gray-600">{item.brand?.name || 'No Brand'}</span>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-
-                            <div className="space-y-3">
-                                <div className="flex justify-between text-sm">
-                                    <span className="text-gray-500">Rental Price</span>
-                                    <span className="font-semibold">Rp {item.rentalPrice.toLocaleString()}</span>
-                                </div>
-                                <div className="h-px bg-gray-50"></div>
-                                <div className="flex items-center gap-2 text-xs text-gray-500">
-                                    <Box size={14} />
-                                    <span>{item.variants?.length || 0} Variants</span>
-                                </div>
-                            </div>
-
-                            <div className="mt-4 pt-4 border-t border-gray-100 flex justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity" onClick={(e) => e.stopPropagation()}>
-                                <button onClick={() => openEditModal(item)} className="p-2 text-gray-600 hover:bg-gray-100 rounded-lg" title="Edit">
-                                    <Edit2 size={16} />
-                                </button>
-                                <button onClick={() => openDetailModal(item)} className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg" title="View Details">
-                                    <Eye size={16} />
-                                </button>
-                            </div>
+                <DataTable
+                    data={filteredItems}
+                    columns={columns}
+                    searchKeys={['name', 'category.name', 'brand.name']}
+                    actions={actionColumn}
+                    filterSlot={
+                        <div className="flex gap-2">
+                            <select
+                                value={selectedCategory}
+                                onChange={(e) => setSelectedCategory(e.target.value)}
+                                className="px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none"
+                            >
+                                <option value="">All Categories</option>
+                                {categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                            </select>
+                            <select
+                                value={selectedBrand}
+                                onChange={(e) => setSelectedBrand(e.target.value)}
+                                className="px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none"
+                            >
+                                <option value="">All Brands</option>
+                                {brands.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
+                            </select>
                         </div>
-                    ))}
-                </div>
+                    }
+                />
             )}
 
             {/* Create/Edit Modal */}

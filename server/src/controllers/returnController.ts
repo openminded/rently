@@ -88,18 +88,20 @@ export const returnController = {
             const { returnDate, fines, itemsStatus, payment } = req.body;
             // itemsStatus: { [sku]: 'AVAILABLE' | 'IN_LAUNDRY' | 'DAMAGED' }
 
+            console.log('Processing return for transaction:', id);
+            console.log('Return data:', { returnDate, fines, itemsStatus, payment });
+
             const result = await prisma.$transaction(async (tx) => {
                 // 1. Update Transaction
                 const transaction = await tx.transaction.update({
                     where: { id: Number(id) },
                     data: {
                         actualReturnDate: new Date(returnDate),
-                        status: 'COMPLETED', // Or RETURNED if payment pending? Let's assume COMPLETED if paid.
-                        // For simplicity in this iteration, marking as COMPLETED or RETURNED.
-                        // If there are fines unpaid, maybe RETURNED.
-                        // Let's calculate total due.
+                        status: 'RETURNED' as any, // Changed from COMPLETED to RETURNED
                     }
                 });
+
+                console.log('Transaction updated:', transaction.id);
 
                 // 2. Add Fines
                 if (fines && fines.length > 0) {
@@ -111,18 +113,26 @@ export const returnController = {
                             note: f.note
                         }))
                     });
+                    console.log('Fines added:', fines.length);
                 }
 
                 // 3. Update Item Instances (Stock)
+                const laundrySkus: string[] = []; // Collect SKUs for laundry processing after transaction
                 if (itemsStatus) {
                     for (const [sku, status] of Object.entries(itemsStatus)) {
-                        // If IN_LAUNDRY, create log? For now just update status.
                         await tx.itemInstance.update({
                             where: { sku },
                             data: {
                                 status: status as any
                             }
                         });
+
+                        console.log(`Item ${sku} status updated to ${status}`);
+
+                        // Collect SKUs that need laundry log
+                        if (status === 'IN_LAUNDRY') {
+                            laundrySkus.push(sku);
+                        }
                     }
                 }
 
@@ -142,18 +152,76 @@ export const returnController = {
                         where: { id: Number(id) },
                         data: {
                             paidAmount: { increment: payment.amount },
-                            paymentStatus: 'PAID' // Simplified logic
+                            paymentStatus: 'PAID' as any // Simplified logic
                         }
                     });
+                    console.log('Payment processed:', payment.amount);
                 }
 
-                return transaction;
+                return { transaction, laundrySkus };
             });
 
-            res.json(result);
+            // Create laundry logs AFTER successful transaction (non-blocking)
+            if (result.laundrySkus && result.laundrySkus.length > 0) {
+                try {
+                    for (const sku of result.laundrySkus) {
+                        await prisma.laundryLog.create({
+                            data: {
+                                itemInstanceSku: sku,
+                                status: 'WAITING'
+                            }
+                        });
+                        console.log(`Laundry log created for ${sku}`);
+                    }
+                } catch (laundryError) {
+                    console.warn('Warning: Could not create laundry logs:', laundryError);
+                    // Don't fail the return - laundry log is optional
+                }
+            }
+
+            // Fetch complete transaction data with relations for response
+            const completeTransaction = await prisma.transaction.findUnique({
+                where: { id: Number(id) },
+                include: {
+                    customer: true,
+                    items: {
+                        include: {
+                            itemInstance: {
+                                include: {
+                                    itemVariant: {
+                                        include: {
+                                            item: true,
+                                            size: true,
+                                            color: true
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    payments: {
+                        include: {
+                            paymentMethod: true
+                        }
+                    },
+                    fines: {
+                        include: {
+                            violationType: true
+                        }
+                    }
+                }
+            });
+
+            console.log('Return processed successfully');
+            res.json({
+                success: true,
+                message: 'Return processed successfully',
+                transaction: completeTransaction
+            });
 
         } catch (error: any) {
-            console.error(error);
+            console.error('Return processing error:', error);
+            console.error('Error stack:', error.stack);
             res.status(500).json({ error: error.message || 'Failed to process return' });
         }
     }

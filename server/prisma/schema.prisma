@@ -8,19 +8,26 @@ datasource db {
 }
 
 // User role enum (Optional later)
+// User role enum
 enum Role {
-  ADMIN
-  STAFF
+  SUPERADMIN
+  OWNER
+  SUPERVISOR
+  KASIR
 }
 
 model User {
   id        Int      @id @default(autoincrement())
   username  String   @unique
   password  String
-  role      Role     @default(STAFF)
+  name      String?
+  role      Role     @default(KASIR)
+  transactions Transaction[]
+  expenses  Expense[]
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 }
+
 
 model Customer {
   id                  Int           @id @default(autoincrement())
@@ -28,6 +35,7 @@ model Customer {
   phone               String        @unique
   address             String?
   identityCardNumber  String?       @unique // KTP
+  identityCardImage   String?       // URL/Path to KTP Image
   createdAt           DateTime      @default(now())
   updatedAt           DateTime      @updatedAt
   transactions        Transaction[]
@@ -92,6 +100,7 @@ model ItemVariant {
   color             Color     @relation(fields: [colorId], references: [id])
   
   instances         ItemInstance[]
+  createdAt         DateTime  @default(now())
 
   @@unique([itemId, sizeId, colorId])
 }
@@ -111,6 +120,7 @@ model ItemInstance {
   
   transactionItems  TransactionItem[]
   laundryLogs       LaundryLog[]
+  createdAt         DateTime          @default(now())
 }
 
 enum TransactionStatus {
@@ -139,6 +149,8 @@ model Transaction {
   type             TransactionType   @default(BOOKING)
   customerId       Int
   customer         Customer          @relation(fields: [customerId], references: [id])
+  userId           Int?
+  user             User?             @relation(fields: [userId], references: [id])
   bookingDate      DateTime          @default(now())
   pickupDate       DateTime
   returnPlanDate   DateTime
@@ -154,6 +166,7 @@ model Transaction {
   
   createdAt        DateTime          @default(now())
   updatedAt        DateTime          @updatedAt
+  note             String?
 }
 
 model TransactionItem {
@@ -201,15 +214,51 @@ model Fine {
   createdAt       DateTime      @default(now())
 }
 
-model LaundryLog {
-  id                 Int         @id @default(autoincrement())
-  itemInstanceSku    String
-  itemInstance       ItemInstance @relation(fields: [itemInstanceSku], references: [sku])
-  sentDate           DateTime    @default(now())
-  expectedReturnDate DateTime?
-  receivedDate       DateTime?
-  status             String      @default("IN_LAUNDRY") // IN_LAUNDRY, COMPLETED
+model LaundryPartner {
+  id        Int            @id @default(autoincrement())
+  name      String
+  phone     String?
+  address   String?
+  createdAt DateTime       @default(now())
+  batches   LaundryBatch[]
 }
+
+model LaundryBatch {
+  id              Int            @id @default(autoincrement())
+  partnerId       Int
+  partner         LaundryPartner @relation(fields: [partnerId], references: [id])
+  sentDate        DateTime       @default(now())
+  completedDate   DateTime?
+  expense         Float          @default(0)
+  status          String         @default("IN_PROGRESS") // IN_PROGRESS, COMPLETED
+  note            String?
+  logs            LaundryLog[]
+  createdAt       DateTime       @default(now())
+}
+
+model LaundryLog {
+  id                 Int           @id @default(autoincrement())
+  itemInstanceSku    String
+  itemInstance       ItemInstance  @relation(fields: [itemInstanceSku], references: [sku])
+  status             String        @default("WAITING") // WAITING, IN_PROGRESS, COMPLETED
+  batchId            Int?
+  batch              LaundryBatch? @relation(fields: [batchId], references: [id])
+  createdAt          DateTime      @default(now())
+  completedDate      DateTime?
+}
+
+model Expense {
+  id          Int      @id @default(autoincrement())
+  type        String   // LAUNDRY, OTHER
+  amount      Float
+  description String
+  date        DateTime @default(now())
+  referenceId Int?     // LaundryBatch ID if type is LAUNDRY
+  createdBy   Int?
+  user        User?    @relation(fields: [createdBy], references: [id])
+  createdAt   DateTime @default(now())
+}
+
 
 model AppSetting {
   id        Int    @id @default(autoincrement())

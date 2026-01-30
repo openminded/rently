@@ -48,6 +48,26 @@ export const deleteItem = (model: any) => async (req: Request, res: Response) =>
     }
 };
 
+// Specialized handler for customer creation with file
+const createCustomer = async (req: Request, res: Response) => {
+    try {
+        const data = req.body;
+
+        // Add image path if file exists
+        if (req.file) {
+            data.identityCardImage = `/uploads/customers/${req.file.filename}`;
+        }
+
+        const item = await prisma.customer.create({
+            data: data
+        });
+        res.status(201).json(item);
+    } catch (error) {
+        console.error("Create Customer Error:", error);
+        res.status(500).json({ error: 'Failed to create customer' });
+    }
+};
+
 export const masterController = {
     categories: {
         getAll: getAll(prisma.category),
@@ -88,7 +108,14 @@ export const masterController = {
     customers: {
         getAll: getAll(prisma.customer),
         create: create(prisma.customer),
+        createWithImage: createCustomer,
         update: update(prisma.customer),
         delete: deleteItem(prisma.customer),
     },
+    laundryPartners: {
+        getAll: getAll(prisma.laundryPartner),
+        create: create(prisma.laundryPartner),
+        update: update(prisma.laundryPartner),
+        delete: deleteItem(prisma.laundryPartner),
+    }
 };

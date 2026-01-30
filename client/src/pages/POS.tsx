@@ -1,9 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { Search, Plus, ShoppingCart, User, Calendar, Trash2 } from 'lucide-react';
 
+import { useAuth } from '../context/AuthContext';
+
 const API_URL = 'http://localhost:3000/api';
 
 export default function POS() {
+    const { token } = useAuth();
     const [cart, setCart] = useState<any[]>([]);
     const [customer, setCustomer] = useState<any>(null);
     const [customers, setCustomers] = useState<any[]>([]);
@@ -21,13 +24,66 @@ export default function POS() {
     const [paymentMethods, setPaymentMethods] = useState<any[]>([]);
     const [selectedPaymentMethod, setSelectedPaymentMethod] = useState<number | null>(null);
 
+    // Add Customer Modal State
+    const [isAddCustomerOpen, setIsAddCustomerOpen] = useState(false);
+    const [newCustomerForm, setNewCustomerForm] = useState({
+        name: '',
+        phone: '',
+        address: '',
+        identityCardNumber: '',
+        identityCardImage: null as File | null
+    });
+    const [isSubmittingCustomer, setIsSubmittingCustomer] = useState(false);
+
+    const handleCustomerSubmit = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!newCustomerForm.address || !newCustomerForm.identityCardNumber || !newCustomerForm.identityCardImage) {
+            return alert("Address, KTP Number, and KTP Image are mandatory.");
+        }
+
+        setIsSubmittingCustomer(true);
+        try {
+            const formData = new FormData();
+            formData.append('name', newCustomerForm.name);
+            formData.append('phone', newCustomerForm.phone);
+            formData.append('address', newCustomerForm.address);
+            formData.append('identityCardNumber', newCustomerForm.identityCardNumber);
+            formData.append('identityCardImage', newCustomerForm.identityCardImage);
+
+            const res = await fetch(`${API_URL}/masters/customers`, {
+                method: 'POST',
+                headers: { 'Authorization': `Bearer ${token}` },
+                body: formData
+            });
+
+            if (res.ok) {
+                const newCustomer = await res.json();
+                setCustomers([...customers, newCustomer]);
+                setCustomer(newCustomer); // Auto select
+                setIsAddCustomerOpen(false);
+                setNewCustomerForm({ name: '', phone: '', address: '', identityCardNumber: '', identityCardImage: null });
+                alert("Customer added successfully!");
+            } else {
+                const err = await res.json();
+                alert(`Failed to add customer: ${err.error || 'Unknown error'}`);
+            }
+        } catch (error) {
+            console.error(error);
+            alert("Error adding customer");
+        } finally {
+            setIsSubmittingCustomer(false);
+        }
+    };
+
     useEffect(() => {
+        if (!token) return;
         const fetchData = async () => {
             try {
+                const headers = { 'Authorization': `Bearer ${token}` };
                 const [itemsRes, customersRes, pmRes] = await Promise.all([
-                    fetch(`${API_URL}/items`),
-                    fetch(`${API_URL}/masters/customers`),
-                    fetch(`${API_URL}/masters/payment-methods`)
+                    fetch(`${API_URL}/items`, { headers }),
+                    fetch(`${API_URL}/masters/customers`, { headers }),
+                    fetch(`${API_URL}/masters/payment-methods`, { headers })
                 ]);
 
                 const itemsData = await itemsRes.json();
@@ -50,7 +106,7 @@ export default function POS() {
             }
         };
         fetchData();
-    }, []);
+    }, [token]);
 
     const handleItemClick = (item: any) => {
         const availableVariants = item.variants?.filter((v: any) => (v._count?.instances || 0) > 0) || [];
@@ -146,7 +202,10 @@ export default function POS() {
         try {
             const res = await fetch(`${API_URL}/transactions`, {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`
+                },
                 body: JSON.stringify({
                     type: transactionType,
                     customerId: customer.id,
@@ -170,7 +229,9 @@ export default function POS() {
                 setCustomer(null);
                 setAmountPaid(0);
                 // Refresh items to update stock
-                const itemsRes = await fetch(`${API_URL}/items`);
+                const itemsRes = await fetch(`${API_URL}/items`, {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
                 setItems(await itemsRes.json());
 
                 // Open Invoice
@@ -236,7 +297,10 @@ export default function POS() {
                 <div className="p-4 border-b border-gray-100">
                     <div className="flex items-center justify-between mb-2">
                         <h3 className="font-semibold text-gray-900">Customer</h3>
-                        <button className="text-blue-600 text-sm hover:underline flex items-center gap-1">
+                        <button
+                            onClick={() => setIsAddCustomerOpen(true)}
+                            className="text-blue-600 text-sm hover:underline flex items-center gap-1"
+                        >
                             <Plus size={14} /> New
                         </button>
                     </div>
@@ -346,6 +410,7 @@ export default function POS() {
                             <label className="text-xs text-gray-400 block mb-1">Start Date</label>
                             <input
                                 type="date"
+                                min={new Date().toISOString().split('T')[0]}
                                 value={pickupDate}
                                 onChange={(e) => setPickupDate(e.target.value)}
                                 className="w-full text-sm p-2 rounded-lg border border-gray-200 outline-none focus:border-blue-500"
@@ -355,6 +420,7 @@ export default function POS() {
                             <label className="text-xs text-gray-400 block mb-1">End Date</label>
                             <input
                                 type="date"
+                                min={pickupDate}
                                 value={returnDate}
                                 onChange={(e) => setReturnDate(e.target.value)}
                                 className="w-full text-sm p-2 rounded-lg border border-gray-200 outline-none focus:border-blue-500"
@@ -391,9 +457,13 @@ export default function POS() {
                     <div>
                         <label className="text-xs text-gray-400 block mb-1">Amount Paid (Rp)</label>
                         <input
-                            type="number"
-                            value={amountPaid}
-                            onChange={(e) => setAmountPaid(Number(e.target.value))}
+                            type="text"
+                            value={amountPaid === 0 ? '' : amountPaid.toLocaleString('id-ID')}
+                            onChange={(e) => {
+                                // Remove non-numeric characters (except for potential future decimal support if needed, but for IDR usually just ints)
+                                const numericValue = e.target.value.replace(/\D/g, '');
+                                setAmountPaid(numericValue ? parseInt(numericValue) : 0);
+                            }}
                             className="w-full p-3 font-mono text-lg font-bold border border-gray-200 rounded-xl focus:border-gray-900 focus:ring-1 focus:ring-gray-900 outline-none"
                             placeholder="0"
                         />
@@ -417,6 +487,90 @@ export default function POS() {
                 </div>
             </div>
 
+            {/* Add Customer Modal */}
+            {isAddCustomerOpen && (
+                <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+                    <div className="bg-white rounded-2xl shadow-xl w-full max-w-md animate-in fade-in zoom-in duration-200">
+                        <div className="p-4 border-b border-gray-100 flex justify-between items-center bg-gray-50 rounded-t-2xl">
+                            <h3 className="font-bold text-gray-900">Add New Customer</h3>
+                            <button onClick={() => setIsAddCustomerOpen(false)} className="p-1 hover:bg-gray-200 rounded-full">
+                                <Trash2 size={16} className="text-gray-400 rotate-45" />
+                            </button>
+                        </div>
+                        <form onSubmit={handleCustomerSubmit} className="p-6 space-y-4">
+                            <div>
+                                <label className="block text-xs font-bold text-gray-500 mb-1">Full Name</label>
+                                <input
+                                    type="text"
+                                    required
+                                    className="w-full p-2 border border-gray-200 rounded-lg outline-none focus:border-blue-500"
+                                    value={newCustomerForm.name}
+                                    onChange={e => setNewCustomerForm({ ...newCustomerForm, name: e.target.value })}
+                                />
+                            </div>
+                            <div>
+                                <label className="block text-xs font-bold text-gray-500 mb-1">Phone Number</label>
+                                <input
+                                    type="text"
+                                    required
+                                    className="w-full p-2 border border-gray-200 rounded-lg outline-none focus:border-blue-500"
+                                    value={newCustomerForm.phone}
+                                    onChange={e => setNewCustomerForm({ ...newCustomerForm, phone: e.target.value })}
+                                />
+                            </div>
+                            <div>
+                                <label className="block text-xs font-bold text-gray-500 mb-1">Domicile Address <span className="text-red-500">*</span></label>
+                                <textarea
+                                    required
+                                    className="w-full p-2 border border-gray-200 rounded-lg outline-none focus:border-blue-500"
+                                    value={newCustomerForm.address}
+                                    onChange={e => setNewCustomerForm({ ...newCustomerForm, address: e.target.value })}
+                                />
+                            </div>
+                            <div>
+                                <label className="block text-xs font-bold text-gray-500 mb-1">KTP Number <span className="text-red-500">*</span></label>
+                                <input
+                                    type="text"
+                                    required
+                                    className="w-full p-2 border border-gray-200 rounded-lg outline-none focus:border-blue-500"
+                                    value={newCustomerForm.identityCardNumber}
+                                    onChange={e => setNewCustomerForm({ ...newCustomerForm, identityCardNumber: e.target.value })}
+                                />
+                            </div>
+                            <div>
+                                <label className="block text-xs font-bold text-gray-500 mb-1">KTP Image <span className="text-red-500">*</span></label>
+                                <input
+                                    type="file"
+                                    accept="image/*"
+                                    required
+                                    className="w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"
+                                    onChange={e => {
+                                        if (e.target.files && e.target.files[0]) {
+                                            setNewCustomerForm({ ...newCustomerForm, identityCardImage: e.target.files[0] });
+                                        }
+                                    }}
+                                />
+                            </div>
+                            <div className="pt-4 flex justify-end gap-3">
+                                <button
+                                    type="button"
+                                    onClick={() => setIsAddCustomerOpen(false)}
+                                    className="px-4 py-2 text-sm font-medium text-gray-600 hover:text-gray-900"
+                                >
+                                    Cancel
+                                </button>
+                                <button
+                                    type="submit"
+                                    disabled={isSubmittingCustomer}
+                                    className="px-4 py-2 bg-gray-900 text-white rounded-lg hover:bg-gray-800 disabled:bg-gray-400"
+                                >
+                                    {isSubmittingCustomer ? 'Saving...' : 'Save Customer'}
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            )}
             {/* Variant Selection Modal */}
             {selectionModal.isOpen && selectionModal.item && (
                 <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">

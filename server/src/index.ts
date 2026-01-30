@@ -2,6 +2,8 @@ import express from 'express';
 import cors from 'cors';
 import { createServer } from 'http';
 import routes from './routes/index.js';
+import dashboardRoutes from './routes/dashboardRoutes.js';
+import userRoutes from './routes/userRoutes.js';
 import path from 'path';
 
 const app = express();
@@ -14,6 +16,9 @@ app.use(express.json());
 app.use('/uploads', express.static('uploads'));
 
 app.use('/api', routes);
+app.use('/api/dashboard', dashboardRoutes);
+app.use('/api/users', userRoutes);
+
 
 app.get('/', (req, res) => {
     res.send('Rumah Dinar POS API is running');
@@ -33,3 +38,8 @@ app.use((req, res) => {
 app.listen(port, () => {
     console.log(`Server is running on port ${port}`);
 });
+
+// Debug: Keep process alive
+setInterval(() => {
+    // console.log('Heartbeat...');
+}, 10000);

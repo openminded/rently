@@ -253,7 +253,10 @@ export const transactionController = {
     returnItems: async (req: Request, res: Response) => {
         try {
             const { id } = req.params;
-            const { returnDate, fines, damageNotes } = req.body;
+            const { returnDate, fines, damageNotes, itemsStatus } = req.body;
+
+            console.log('Processing return for transaction:', id);
+            console.log('Request body:', { returnDate, fines, itemsStatus });
 
             const transaction = await prisma.transaction.findUnique({
                 where: { id: parseInt(id) },
@@ -263,8 +266,12 @@ export const transactionController = {
             if (!transaction) return res.status(404).json({ error: 'Transaction not found' });
             if (transaction.status !== 'RENTED') return res.status(400).json({ error: 'Transaction is not RENTED' });
 
+            // Collect SKUs for laundry log creation (outside transaction)
+            const laundrySkus: string[] = [];
+
             await prisma.$transaction(async (tx) => {
                 // 1. Record Fines if any
+                let totalFineAmount = 0;
                 if (fines && fines.length > 0) {
                     for (const fine of fines) {
                         await tx.fine.create({
@@ -275,40 +282,79 @@ export const transactionController = {
                                 note: fine.note
                             }
                         });
+                        totalFineAmount += fine.amount;
                     }
                 }
 
-                // 2. Update Transaction
+                // 2. Process Payment if any (for Fines or Late Fees)
+                const { payment } = req.body;
+                let addedPayment = 0;
+                if (payment && payment.amount > 0) {
+                    await tx.payment.create({
+                        data: {
+                            transactionId: transaction.id,
+                            amount: parseFloat(payment.amount),
+                            paymentMethodId: payment.methodId,
+                            note: payment.note || 'Fine Payment'
+                        }
+                    });
+                    addedPayment = parseFloat(payment.amount);
+                }
+
+                // 3. Update Transaction (Status, Dates, Amounts)
                 await tx.transaction.update({
                     where: { id: transaction.id },
                     data: {
-                        status: 'RETURNED', // Or COMPLETED if fully paid including fines? Let's say RETURNED for now.
-                        actualReturnDate: new Date(returnDate || new Date())
+                        status: 'RETURNED',
+                        actualReturnDate: new Date(returnDate || new Date()),
+                        totalAmount: { increment: totalFineAmount }, // Add fines to total obligation
+                        paidAmount: { increment: addedPayment }      // Add payment to total paid
                     }
                 });
 
-                // 3. Move Items to Laundry Queue (Default flow)
+                // 4. Move Items to Laundry Queue (Update status only, log created later)
                 for (const item of transaction.items) {
-                    // Update Instance
+                    // Update Instance to IN_LAUNDRY
                     await tx.itemInstance.update({
                         where: { sku: item.itemInstanceSku },
                         data: { status: 'IN_LAUNDRY' }
                     });
-
-                    // Create Laundry Log
-                    await tx.laundryLog.create({
-                        data: {
-                            itemInstanceSku: item.itemInstanceSku,
-                            status: 'IN_LAUNDRY'
-                        }
-                    });
+                    laundrySkus.push(item.itemInstanceSku);
+                    console.log(`Item ${item.itemInstanceSku} status updated to IN_LAUNDRY`);
                 }
             });
 
-            res.json({ message: 'Return processed successfully' });
+            // 5. Create Laundry Logs AFTER transaction success (non-blocking)
+            console.log('LaundrySkus to create logs for:', laundrySkus);
+            if (laundrySkus.length > 0) {
+                for (const sku of laundrySkus) {
+                    try {
+                        console.log(`Attempting to create LaundryLog for SKU: ${sku}`);
+                        const logResult = await prisma.laundryLog.create({
+                            data: {
+                                itemInstanceSku: sku,
+                                status: 'WAITING'
+                            }
+                        });
+                        console.log(`LaundryLog created successfully:`, logResult);
+                    } catch (laundryError: any) {
+                        console.error(`FAILED to create LaundryLog for ${sku}:`);
+                        console.error('Error name:', laundryError.name);
+                        console.error('Error message:', laundryError.message);
+                        console.error('Error code:', laundryError.code);
+                        console.error('Full error:', laundryError);
+                        // Continue to next SKU instead of failing entirely
+                    }
+                }
+            } else {
+                console.log('No laundrySkus to process - transaction.items might be empty');
+            }
+
+            console.log('Return processed successfully');
+            res.json({ success: true, message: 'Return processed successfully' });
 
         } catch (error) {
-            console.error(error);
+            console.error('Return error:', error);
             res.status(500).json({ error: 'Return failed' });
         }
     },
@@ -340,6 +386,11 @@ export const transactionController = {
                         include: {
                             paymentMethod: true
                         }
+                    },
+                    fines: {
+                        include: {
+                            violationType: true
+                        }
                     }
                 }
             });
@@ -352,6 +403,44 @@ export const transactionController = {
             res.json(tx);
         } catch (error) {
             res.status(500).json({ error: 'Failed to fetch transaction' });
+        }
+    },
+
+    markInvalid: async (req: Request, res: Response) => {
+        const { id } = req.params;
+        const { note } = req.body;
+
+        try {
+            await prisma.$transaction(async (tx) => {
+                const transaction = await tx.transaction.findUnique({
+                    where: { id: parseInt(id) },
+                    include: { items: true }
+                });
+
+                if (!transaction) throw new Error("Transaction not found");
+
+                // Update Transaction
+                await tx.transaction.update({
+                    where: { id: parseInt(id) },
+                    data: {
+                        status: 'CANCELLED', // @ts-ignore
+                        note: note ? `Invalid: ${note}` : 'Marked as Invalid'
+                    }
+                });
+
+                // Return Items to Available
+                for (const item of transaction.items) {
+                    await tx.itemInstance.update({
+                        where: { sku: item.itemInstanceSku },
+                        data: { status: 'AVAILABLE' }
+                    });
+                }
+            });
+
+            res.json({ message: "Transaction marked as Invalid" });
+        } catch (error) {
+            console.error(error);
+            res.status(500).json({ error: "Failed to invalidate transaction" });
         }
     }
 };

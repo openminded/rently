@@ -220,4 +220,85 @@ export const inventoryController = {
             res.status(500).json({ error: 'Failed to fetch stock' });
         }
     },
+    // History & Resume
+    getResume: async (req: Request, res: Response) => {
+        try {
+            const variants = await prisma.itemVariant.findMany({
+                include: {
+                    item: true,
+                    size: true,
+                    color: true,
+                    instances: true
+                }
+            });
+
+            const resume = variants.map(v => ({
+                id: v.id,
+                itemName: v.item.name,
+                size: v.size.name,
+                color: v.color.name,
+                total: v.instances.length,
+                available: v.instances.filter((i: any) => i.status === 'AVAILABLE').length,
+                rented: v.instances.filter((i: any) => i.status === 'RENTED').length,
+                laundry: v.instances.filter((i: any) => i.status === 'IN_LAUNDRY').length,
+                notReady: v.instances.filter((i: any) => i.status === 'NOT_READY').length,
+            }));
+
+            res.json(resume);
+        } catch (error) {
+            console.error(error);
+            res.status(500).json({ error: 'Failed to fetch resume' });
+        }
+    },
+
+    getHistory: async (req: Request, res: Response) => {
+        try {
+            // 1. Stock Additions
+            const stockLogs = await prisma.itemInstance.findMany({
+                // @ts-ignore
+                orderBy: { createdAt: 'desc' },
+                take: 50,
+                include: {
+                    itemVariant: {
+                        include: { item: true, size: true, color: true }
+                    }
+                }
+            });
+
+            const formattedStockLogs = stockLogs.map(l => ({
+                type: 'STOCK_ADDED',
+                // @ts-ignore
+                date: l.createdAt,
+                // @ts-ignore
+                description: `New Stock Added: ${l.itemVariant.item.name} (${l.itemVariant.size.name}, ${l.itemVariant.color.name}) - SKU ${l.sku}`,
+                relatedId: l.sku
+            }));
+
+            // 2. Transactions
+            const transactions = await prisma.transaction.findMany({
+                orderBy: { createdAt: 'desc' },
+                take: 50,
+                include: {
+                    customer: true,
+                    items: { include: { itemInstance: { include: { itemVariant: { include: { item: true } } } } } }
+                }
+            });
+
+            const formattedTransactions = transactions.map(t => ({
+                type: 'ORDER',
+                date: t.createdAt,
+                description: `Order #${t.id} by ${t.customer.name} - ${t.items.length} items`,
+                status: t.status,
+                relatedId: t.id
+            }));
+
+            // Combine and Sort
+            const history = [...formattedStockLogs, ...formattedTransactions].sort((a: any, b: any) => new Date(b.date).getTime() - new Date(a.date).getTime());
+
+            res.json(history);
+        } catch (error) {
+            console.error(error);
+            res.status(500).json({ error: 'Failed to fetch history' });
+        }
+    },
 };
