@@ -17,7 +17,12 @@ export function useDataTable<T>(data: T[], searchKeys: string[]) {
         const lowerQuery = searchQuery.toLowerCase();
         return data.filter(item => {
             return searchKeys.some(key => {
-                const val = (item as any)[key];
+                const keys = key.split('.');
+                let val = item as any;
+                for (const k of keys) {
+                    val = val?.[k];
+                    if (val === undefined || val === null) break;
+                }
                 return val ? String(val).toLowerCase().includes(lowerQuery) : false;
             });
         });

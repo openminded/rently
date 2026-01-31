@@ -1,11 +1,13 @@
 import { useState } from 'react';
 import { Download, Upload, RefreshCw, Trash2, AlertTriangle } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
+import { useLanguage } from '../../context/LanguageContext';
 
 const API_URL = 'http://localhost:3000/api/backup';
 
 export default function BackupRestore() {
     const { token } = useAuth();
+    const { t } = useLanguage();
     const [loading, setLoading] = useState(false);
     const [progress, setProgress] = useState(0);
     const [status, setStatus] = useState('');
@@ -28,7 +30,7 @@ export default function BackupRestore() {
 
     const handleBackup = async () => {
         setLoading(true);
-        setStatus('Generating backup...');
+        setStatus(t('backup.status.generating'));
         const interval = simulateProgress(2000);
 
         try {
@@ -48,11 +50,11 @@ export default function BackupRestore() {
             document.body.removeChild(a);
 
             setProgress(100);
-            setStatus('Backup downloaded successfully!');
+            setStatus(t('backup.status.downloadSuccess'));
         } catch (error) {
             console.error(error);
-            setStatus('Backup failed.');
-            alert('Backup failed');
+            setStatus(t('common.error'));
+            alert(t('common.error'));
         } finally {
             clearInterval(interval);
             setTimeout(() => { setLoading(false); setProgress(0); }, 3000);
@@ -60,11 +62,11 @@ export default function BackupRestore() {
     };
 
     const handleRestore = async () => {
-        if (!restoreFile) return alert("Select a file first");
-        if (!confirm("WARNING: This will replace ALL existing data with the backup. Continue?")) return;
+        if (!restoreFile) return alert(t('backup.alert.selectFile'));
+        if (!confirm(t('backup.alert.confirmRestore'))) return;
 
         setLoading(true);
-        setStatus('Restoring data... This may take a while.');
+        setStatus(t('backup.status.restoring'));
         const interval = simulateProgress(5000);
 
         try {
@@ -83,12 +85,12 @@ export default function BackupRestore() {
             }
 
             setProgress(100);
-            setStatus('Restore completed successfully! Reloading...');
+            setStatus(t('backup.status.restoreSuccess'));
             setTimeout(() => window.location.reload(), 2000);
         } catch (error: any) {
             console.error(error);
-            setStatus(`Restore failed: ${error.message}`);
-            alert(`Restore failed: ${error.message}`);
+            setStatus(`${t('common.error')}: ${error.message}`);
+            alert(`${t('common.error')}: ${error.message}`);
             setLoading(false);
         } finally {
             clearInterval(interval);
@@ -96,12 +98,12 @@ export default function BackupRestore() {
     };
 
     const handleReset = async () => {
-        if (!confirm("DANGER: This will DELETE ALL DATA permanently. Are you sure?")) return;
-        const confirmText = prompt("Type 'RESET' to confirm deletion:");
-        if (confirmText !== 'RESET') return alert("Reset cancelled.");
+        if (!confirm(t('backup.alert.confirmReset'))) return;
+        const confirmText = prompt(t('backup.alert.typeReset'));
+        if (confirmText !== 'RESET') return alert(t('backup.alert.resetCancelled'));
 
         setLoading(true);
-        setStatus('Clearing all data...');
+        setStatus(t('backup.status.clearing'));
         const interval = simulateProgress(3000);
 
         try {
@@ -112,12 +114,12 @@ export default function BackupRestore() {
             if (!res.ok) throw new Error('Reset failed');
 
             setProgress(100);
-            setStatus('All data cleared successfully.');
+            setStatus(t('backup.status.clearSuccess'));
             setTimeout(() => window.location.reload(), 2000);
         } catch (error) {
             console.error(error);
-            setStatus('Reset failed.');
-            alert('Reset failed');
+            setStatus(t('common.error'));
+            alert(t('common.error'));
             setLoading(false);
         } finally {
             clearInterval(interval);
@@ -127,8 +129,8 @@ export default function BackupRestore() {
     return (
         <div className="max-w-4xl mx-auto space-y-8 p-4">
             <div className="mb-8">
-                <h1 className="text-2xl font-bold text-gray-900">Backup & Restore</h1>
-                <p className="text-gray-500">Manage your system data securely.</p>
+                <h1 className="text-2xl font-bold text-gray-900">{t('backup.title')}</h1>
+                <p className="text-gray-500">{t('backup.subtitle')}</p>
             </div>
 
             {loading && (
@@ -148,14 +150,14 @@ export default function BackupRestore() {
                     <div className="w-12 h-12 bg-green-100 rounded-xl flex items-center justify-center mb-4">
                         <Download className="text-green-600" size={24} />
                     </div>
-                    <h3 className="text-lg font-bold text-gray-900 mb-2">Backup Data</h3>
-                    <p className="text-sm text-gray-500 mb-6">Download a full backup of your database as a JSON file. Keep this file safe.</p>
+                    <h3 className="text-lg font-bold text-gray-900 mb-2">{t('backup.card.backup.title')}</h3>
+                    <p className="text-sm text-gray-500 mb-6">{t('backup.card.backup.desc')}</p>
                     <button
                         onClick={handleBackup}
                         disabled={loading}
                         className="w-full py-3 bg-gray-900 text-white rounded-xl font-medium hover:bg-gray-800 transition-colors flex items-center justify-center gap-2 disabled:bg-gray-400"
                     >
-                        <Download size={18} /> Download Backup
+                        <Download size={18} /> {t('backup.card.backup.action')}
                     </button>
                 </div>
 
@@ -164,8 +166,8 @@ export default function BackupRestore() {
                     <div className="w-12 h-12 bg-orange-100 rounded-xl flex items-center justify-center mb-4">
                         <Upload className="text-orange-600" size={24} />
                     </div>
-                    <h3 className="text-lg font-bold text-gray-900 mb-2">Restore Data</h3>
-                    <p className="text-sm text-gray-500 mb-6">Upload a valid backup JSON file to restore your data. ⚠️ This will overwrite existing data.</p>
+                    <h3 className="text-lg font-bold text-gray-900 mb-2">{t('backup.card.restore.title')}</h3>
+                    <p className="text-sm text-gray-500 mb-6">{t('backup.card.restore.desc')}</p>
 
                     <div className="space-y-4">
                         <div className="relative">
@@ -181,7 +183,7 @@ export default function BackupRestore() {
                             disabled={loading || !restoreFile}
                             className="w-full py-3 bg-orange-600 text-white rounded-xl font-medium hover:bg-orange-700 transition-colors flex items-center justify-center gap-2 disabled:bg-gray-300"
                         >
-                            <RefreshCw size={18} /> Restore Data
+                            <RefreshCw size={18} /> {t('backup.card.restore.action')}
                         </button>
                     </div>
                 </div>
@@ -194,14 +196,14 @@ export default function BackupRestore() {
                         <AlertTriangle className="text-red-600" size={24} />
                     </div>
                     <div className="flex-1">
-                        <h3 className="text-lg font-bold text-red-900 mb-1">Danger Zone</h3>
-                        <p className="text-sm text-red-700 mb-6">Clear all data from the system. This action cannot be undone.</p>
+                        <h3 className="text-lg font-bold text-red-900 mb-1">{t('backup.card.danger.title')}</h3>
+                        <p className="text-sm text-red-700 mb-6">{t('backup.card.danger.desc')}</p>
                         <button
                             onClick={handleReset}
                             disabled={loading}
                             className="px-6 py-2 bg-red-600 text-white rounded-lg font-medium hover:bg-red-700 transition-colors flex items-center gap-2 disabled:opacity-50"
                         >
-                            <Trash2 size={18} /> Clear All Data
+                            <Trash2 size={18} /> {t('backup.card.danger.action')}
                         </button>
                     </div>
                 </div>

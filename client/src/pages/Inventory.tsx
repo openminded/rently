@@ -6,9 +6,11 @@ import ProductDetail from '../components/ProductDetail';
 const API_URL = 'http://localhost:3000/api';
 
 import { useAuth } from '../context/AuthContext';
+import { useLanguage } from '../context/LanguageContext';
 
 export default function Inventory() {
     const { token } = useAuth();
+    const { t } = useLanguage();
     const [items, setItems] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
 
@@ -66,12 +68,25 @@ export default function Inventory() {
                 fetch(`${API_URL}/masters/sizes`, { headers }),
                 fetch(`${API_URL}/masters/colors`, { headers })
             ]);
-            setCategories(await catRes.json());
-            setBrands(await brandRes.json());
-            setSizes(await sizeRes.json());
-            setColors(await colorRes.json());
+
+            const catData = await catRes.json();
+            setCategories(Array.isArray(catData) ? catData : []);
+
+            const brandData = await brandRes.json();
+            setBrands(Array.isArray(brandData) ? brandData : []);
+
+            const sizeData = await sizeRes.json();
+            setSizes(Array.isArray(sizeData) ? sizeData : []);
+
+            const colorData = await colorRes.json();
+            setColors(Array.isArray(colorData) ? colorData : []);
         } catch (e) {
             console.error("Failed to fetch masters", e);
+            // Fallback to empty arrays on error
+            setCategories([]);
+            setBrands([]);
+            setSizes([]);
+            setColors([]);
         }
     };
 
@@ -106,7 +121,10 @@ export default function Inventory() {
     const removeExistingImage = async (imageId: number) => {
         if (!confirm('Delete this image?')) return;
         try {
-            await fetch(`${API_URL}/items/images/${imageId}`, { method: 'DELETE' });
+            await fetch(`${API_URL}/items/images/${imageId}`, {
+                method: 'DELETE',
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
             // Update local state
             setExistingImages(existingImages.filter(img => img.id !== imageId));
             // Also update viewItem if detail is valid
@@ -154,7 +172,10 @@ export default function Inventory() {
         try {
             const res = await fetch(`${API_URL}/items/variants`, {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`
+                },
                 body: JSON.stringify({
                     itemId: currentItem.id,
                     sizeId: Number(selectedSize),
@@ -195,7 +216,10 @@ export default function Inventory() {
         }
 
         try {
-            const res = await fetch(`${API_URL}/items/variants/${variantId}`, { method: 'DELETE' });
+            const res = await fetch(`${API_URL}/items/variants/${variantId}`, {
+                method: 'DELETE',
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
             if (res.ok) {
                 const updatedVariants = currentItem.variants.filter((v: any) => v.id !== variantId);
                 setCurrentItem({ ...currentItem, variants: updatedVariants });
@@ -217,7 +241,10 @@ export default function Inventory() {
         try {
             const res = await fetch(`${API_URL}/items/stock`, {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`
+                },
                 body: JSON.stringify({
                     itemVariantId: variantId,
                     quantity: qty
@@ -228,25 +255,21 @@ export default function Inventory() {
                 alert(`Added ${qty} items to stock!`);
                 // Ideally refresh specific item or fetch all. Fetching all for simplicity.
                 fetchItems();
-                // We also need to update currentItem to reflect changes immediately if we want
-                // But since fetchItems updates 'items', and currentItem is separate state...
-                // We should re-fetch the specific item or manually update currentItem count.
-                // Let's just fetchItems and close modal or rely on user re-opening? 
-                // Better: update local state count.
+                setIsModalOpen(false); // Close modal to refresh or just let user stay? 
+                // Since we rely on fetchItems to update 'items' and 'currentItem' is state...
+                // The easiest is to close modal or force re-sync of currentItem.
+                // For now, let's keep modal open but we need to update 'currentItem' instance list?
+                // Actually, fetchItems updates 'items'. 'currentItem' is a separate state clone.
+                // We'd need to re-fetch the item to get the new instances.
+                // Simplest: Close modal OR just let fetchItems run and user can re-open.
+                // Or: don't optimistic update, just alert.
+                // The user probably wants to see the count update.
+                // Since we can't easily push to 'instances' without the new ID/sku structure (which backend returns in 'results'),
+                // and we don't have 'results' captured here fully...
+                // let's just close modal for safety or re-fetch item.
 
-                const updatedVariants = currentItem.variants.map((v: any) => {
-                    if (v.id === variantId) {
-                        return {
-                            ...v,
-                            _count: { instances: (v._count?.instances || 0) + qty }
-                        };
-                    }
-                    return v;
-                });
-                setCurrentItem({ ...currentItem, variants: updatedVariants });
-                // Main list update is handled by fetchItems below, but for immediate UI feedback:
-                setItems(prev => prev.map(i => i.id === currentItem.id ? { ...i, variants: updatedVariants } : i));
-
+                // Since I can't easily update 'currentItem' structure deeply without logic,
+                // I will skip optimistic update and rely on fetch.
             } else {
                 alert('Failed to add stock');
             }
@@ -302,6 +325,7 @@ export default function Inventory() {
         try {
             const res = await fetch(url, {
                 method: method,
+                headers: { 'Authorization': `Bearer ${token}` },
                 body: formData
             });
             if (res.ok) {
@@ -311,10 +335,12 @@ export default function Inventory() {
                 setExistingImages([]);
                 fetchItems();
             } else {
-                alert('Failed to save item');
+                const err = await res.json();
+                alert(`Failed to save item: ${err.error || 'Unknown error'}`);
             }
         } catch (e) {
             console.error(e);
+            alert('An unexpected error occurred while saving.');
         } finally {
             setLoading(false);
         }
@@ -323,10 +349,29 @@ export default function Inventory() {
     // Filter State
     const [selectedCategory, setSelectedCategory] = useState('');
     const [selectedBrand, setSelectedBrand] = useState('');
+    const [selectedStatus, setSelectedStatus] = useState('');
+
+    const getItemStats = (item: any) => {
+        let total = 0;
+        let available = 0;
+        let rented = 0;
+        let laundry = 0;
+
+        item.variants?.forEach((v: any) => {
+            if (v.instances) {
+                total += v.instances.length;
+                available += v.instances.filter((i: any) => i.status === 'AVAILABLE').length;
+                rented += v.instances.filter((i: any) => i.status === 'RENTED').length;
+                laundry += v.instances.filter((i: any) => ['IN_LAUNDRY', 'LAUNDRY'].includes(i.status)).length;
+            }
+        });
+
+        return { total, available, rented, laundry };
+    };
 
     const columns: Column<any>[] = [
         {
-            header: 'Image',
+            header: t('inventory.table.image'),
             accessorKey: 'images',
             className: 'w-20',
             cell: (item) => (
@@ -340,7 +385,7 @@ export default function Inventory() {
             )
         },
         {
-            header: 'Item',
+            header: t('inventory.table.item'),
             accessorKey: 'name',
             sortable: true,
             cell: (item) => (
@@ -354,20 +399,42 @@ export default function Inventory() {
             )
         },
         {
-            header: 'Rental Price',
+            header: t('inventory.table.rentalPrice'),
             accessorKey: 'rentalPrice',
             sortable: true,
             cell: (item) => <span className="font-medium">Rp {item.rentalPrice.toLocaleString()}</span>
         },
         {
-            header: 'Variants',
-            accessorKey: 'variants',
-            cell: (item) => (
-                <div className="flex items-center gap-1 text-xs text-gray-500">
-                    <Box size={14} />
-                    <span>{item.variants?.length || 0}</span>
-                </div>
-            )
+            header: t('inventory.table.totalUnits'),
+            accessorKey: 'totalUnits', // Virtual key
+            cell: (item) => {
+                const stats = getItemStats(item);
+                return <span className="font-medium text-gray-900">{stats.total}</span>;
+            }
+        },
+        {
+            header: t('inventory.table.available'),
+            accessorKey: 'available', // Virtual key
+            cell: (item) => {
+                const stats = getItemStats(item);
+                return <span className="font-medium text-green-600">{stats.available}</span>;
+            }
+        },
+        {
+            header: t('inventory.table.inRent'),
+            accessorKey: 'rented', // Virtual key
+            cell: (item) => {
+                const stats = getItemStats(item);
+                return <span className="font-medium text-blue-600">{stats.rented}</span>;
+            }
+        },
+        {
+            header: t('inventory.table.laundry'),
+            accessorKey: 'laundry', // Virtual key
+            cell: (item) => {
+                const stats = getItemStats(item);
+                return <span className="font-medium text-purple-600">{stats.laundry}</span>;
+            }
         }
     ];
 
@@ -382,10 +449,19 @@ export default function Inventory() {
         </div>
     );
 
-    // Apply Filters (Category/Brand)
+    // Apply Filters (Category/Brand/Status)
     const filteredItems = items.filter(item => {
         if (selectedCategory && item.categoryId != selectedCategory) return false;
         if (selectedBrand && item.brandId != selectedBrand) return false;
+
+        if (selectedStatus) {
+            const stats = getItemStats(item);
+            if (selectedStatus === 'AVAILABLE' && stats.available === 0) return false;
+            if (selectedStatus === 'OUT_OF_STOCK' && stats.available > 0) return false;
+            if (selectedStatus === 'IN_LAUNDRY' && stats.laundry === 0) return false;
+            if (selectedStatus === 'RENTED' && stats.rented === 0) return false;
+        }
+
         return true;
     });
 
@@ -393,19 +469,19 @@ export default function Inventory() {
         <div className="space-y-6">
             <div className="flex items-center justify-between">
                 <div>
-                    <h1 className="text-2xl font-bold text-gray-900">Inventory Management</h1>
-                    <p className="text-gray-500">Track items, variants, and stock status</p>
+                    <h1 className="text-2xl font-bold text-gray-900">{t('inventory.title')}</h1>
+                    <p className="text-gray-500">{t('inventory.subtitle')}</p>
                 </div>
                 <button
                     onClick={openCreateModal}
                     className="bg-gray-900 text-white px-4 py-2 rounded-lg flex items-center gap-2 hover:bg-gray-800 transition-colors"
                 >
-                    <Plus size={18} /> Add New Item
+                    <Plus size={18} /> {t('inventory.add')}
                 </button>
             </div>
 
             {loading ? (
-                <div className="text-center py-20 text-gray-400">Loading Inventory...</div>
+                <div className="text-center py-20 text-gray-400">{t('common.loading')}</div>
             ) : (
                 <DataTable
                     data={filteredItems}
@@ -415,11 +491,22 @@ export default function Inventory() {
                     filterSlot={
                         <div className="flex gap-2">
                             <select
+                                value={selectedStatus}
+                                onChange={(e) => setSelectedStatus(e.target.value)}
+                                className="px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none"
+                            >
+                                <option value="">{t('inventory.filter.allStatus')}</option>
+                                <option value="AVAILABLE">{t('inventory.filter.available')}</option>
+                                <option value="OUT_OF_STOCK">{t('inventory.filter.outOfStock')}</option>
+                                <option value="IN_LAUNDRY">{t('inventory.filter.inLaundry')}</option>
+                                <option value="RENTED">{t('inventory.filter.rented')}</option>
+                            </select>
+                            <select
                                 value={selectedCategory}
                                 onChange={(e) => setSelectedCategory(e.target.value)}
                                 className="px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none"
                             >
-                                <option value="">All Categories</option>
+                                <option value="">{t('inventory.filter.allCategories')}</option>
                                 {categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
                             </select>
                             <select
@@ -427,7 +514,7 @@ export default function Inventory() {
                                 onChange={(e) => setSelectedBrand(e.target.value)}
                                 className="px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none"
                             >
-                                <option value="">All Brands</option>
+                                <option value="">{t('inventory.filter.allBrands')}</option>
                                 {brands.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
                             </select>
                         </div>
@@ -438,41 +525,41 @@ export default function Inventory() {
             {/* Create/Edit Modal */}
             {isModalOpen && (
                 <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-                    <div className="bg-white rounded-xl shadow-xl p-6 w-full max-w-md animate-in fade-in zoom-in duration-200 overflow-y-auto max-h-[90vh]">
+                    <div className="bg-white rounded-xl shadow-xl p-6 w-full max-w-2xl animate-in fade-in zoom-in duration-200 overflow-y-auto max-h-[90vh]">
                         <div className="flex justify-between items-center mb-6">
-                            <h3 className="text-lg font-bold">{currentItem ? 'Edit Item' : 'New Inventory Item'}</h3>
+                            <h3 className="text-lg font-bold">{currentItem ? t('inventory.edit') : t('inventory.newItem')}</h3>
                             <button onClick={() => setIsModalOpen(false)} className="text-gray-400 hover:text-gray-900"><X size={20} /></button>
                         </div>
                         <form onSubmit={handleSubmit} className="space-y-4">
                             <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-1">Item Name</label>
+                                <label className="block text-sm font-medium text-gray-700 mb-1">{t('inventory.form.itemName')}</label>
                                 <input name="name" defaultValue={currentItem?.name} className="w-full p-2 border border-gray-300 rounded-lg outline-none focus:border-blue-500" required />
                             </div>
-                            <div className="grid grid-cols-2 gap-4">
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                 <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-1">Category</label>
+                                    <label className="block text-sm font-medium text-gray-700 mb-1">{t('inventory.form.category')}</label>
                                     <select name="categoryId" defaultValue={currentItem?.categoryId} className="w-full p-2 border border-gray-300 rounded-lg outline-none focus:border-blue-500">
                                         {categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
                                     </select>
                                 </div>
                                 <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-1">Brand</label>
+                                    <label className="block text-sm font-medium text-gray-700 mb-1">{t('inventory.form.brand')}</label>
                                     <select name="brandId" defaultValue={currentItem?.brandId} className="w-full p-2 border border-gray-300 rounded-lg outline-none focus:border-blue-500">
                                         {brands.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
                                     </select>
                                 </div>
                             </div>
                             <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-1">Rental Price</label>
+                                <label className="block text-sm font-medium text-gray-700 mb-1">{t('inventory.table.rentalPrice')}</label>
                                 <input name="rentalPrice" type="number" defaultValue={currentItem?.rentalPrice} className="w-full p-2 border border-gray-300 rounded-lg outline-none focus:border-blue-500" required />
                             </div>
                             <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-1">Description</label>
+                                <label className="block text-sm font-medium text-gray-700 mb-1">{t('inventory.form.description')}</label>
                                 <textarea name="description" defaultValue={currentItem?.description} className="w-full p-2 border border-gray-300 rounded-lg outline-none focus:border-blue-500" rows={3}></textarea>
                             </div>
 
                             <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-1">Images (Max 5)</label>
+                                <label className="block text-sm font-medium text-gray-700 mb-1">{t('inventory.form.images')}</label>
                                 <div className="flex flex-wrap gap-2 mb-2">
                                     {/* Existing Images */}
                                     {existingImages.map((img: any) => (
@@ -513,11 +600,11 @@ export default function Inventory() {
 
                             {/* Variants Section - Create & Edit Mode */}
                             <div className="bg-gray-50 p-4 rounded-xl border border-gray-200">
-                                <h4 className="font-bold text-gray-800 mb-3 text-sm">Manage Variants</h4>
+                                <h4 className="font-bold text-gray-800 mb-3 text-sm">{t('inventory.form.manageVariants')}</h4>
 
                                 {/* List Variants (Local or Existing) */}
                                 <div className="space-y-2 mb-4">
-                                    {(currentItem ? currentItem.variants : localVariants).map((v: any) => (
+                                    {(currentItem ? (currentItem.variants || []) : localVariants).map((v: any) => (
                                         <div key={v.id} className="flex items-center justify-between bg-white p-2 rounded shadow-sm">
                                             <div className="flex items-center gap-3">
                                                 <div className="w-4 h-4 rounded-full border" style={{ backgroundColor: v.color?.hexCode }}></div>
@@ -525,15 +612,15 @@ export default function Inventory() {
                                                 {/* Show stock if available or quantity if local */}
                                                 <span className="text-xs bg-gray-100 px-2 py-0.5 rounded text-gray-600 font-medium">
                                                     {currentItem
-                                                        ? `Stock: ${v._count?.instances || 0}`
-                                                        : `Initial: ${v.quantity || 0}`
+                                                        ? `${t('inventory.form.stock')}: ${v.instances?.filter((i: any) => i.status === 'AVAILABLE').length || 0}`
+                                                        : `${t('inventory.form.initialStock')}: ${v.quantity || 0}`
                                                     }
                                                 </span>
                                             </div>
                                             <div className="flex items-center gap-1">
                                                 {currentItem && (
                                                     <button type="button" onClick={() => handleAddStock(v.id)} className="text-green-600 hover:bg-green-50 p-1 rounded text-xs px-2 border border-green-200">
-                                                        + Add Stock
+                                                        + {t('inventory.form.addStock')}
                                                     </button>
                                                 )}
                                                 <button type="button" onClick={() => handleDeleteVariant(v.id)} className="text-red-500 hover:bg-red-50 p-1 rounded">
@@ -542,32 +629,32 @@ export default function Inventory() {
                                             </div>
                                         </div>
                                     ))}
-                                    {((currentItem ? currentItem.variants : localVariants)?.length === 0) && (
-                                        <p className="text-xs text-gray-500 italic">No variants added yet.</p>
+                                    {((currentItem ? (currentItem.variants || []) : localVariants).length === 0) && (
+                                        <p className="text-xs text-gray-500 italic">{t('inventory.form.noVariants')}</p>
                                     )}
                                 </div>
 
                                 {/* Add New */}
                                 <div className="flex gap-2 items-end">
                                     <div className="flex-1">
-                                        <label className="block text-xs font-medium text-gray-600 mb-1">Size</label>
+                                        <label className="block text-xs font-medium text-gray-600 mb-1">{t('master.sizes.title')}</label>
                                         <select
                                             value={selectedSize}
                                             onChange={(e) => setSelectedSize(e.target.value)}
                                             className="w-full p-2 text-sm border rounded outline-none"
                                         >
-                                            <option value="">Select Size</option>
+                                            <option value="">{t('common.select')} {t('master.sizes.title')}</option>
                                             {sizes.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
                                         </select>
                                     </div>
                                     <div className="flex-1">
-                                        <label className="block text-xs font-medium text-gray-600 mb-1">Color</label>
+                                        <label className="block text-xs font-medium text-gray-600 mb-1">{t('master.colors.title')}</label>
                                         <select
                                             value={selectedColor}
                                             onChange={(e) => setSelectedColor(e.target.value)}
                                             className="w-full p-2 text-sm border rounded outline-none"
                                         >
-                                            <option value="">Select Color</option>
+                                            <option value="">{t('common.select')} {t('master.colors.title')}</option>
                                             {colors.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
                                         </select>
                                     </div>
@@ -584,9 +671,9 @@ export default function Inventory() {
 
 
                             <div className="flex justify-end gap-3 pt-4">
-                                <button type="button" onClick={() => setIsModalOpen(false)} className="px-4 py-2 text-gray-600 hover:bg-gray-100 rounded-lg">Cancel</button>
+                                <button type="button" onClick={() => setIsModalOpen(false)} className="px-4 py-2 text-gray-600 hover:bg-gray-100 rounded-lg">{t('common.cancel')}</button>
                                 <button type="submit" className="px-4 py-2 bg-gray-900 text-white rounded-lg hover:bg-gray-800 flex items-center gap-2">
-                                    <Save size={16} /> {currentItem ? 'Save Changes' : 'Create Item'}
+                                    <Save size={16} /> {currentItem ? t('inventory.form.saveChanges') : t('inventory.form.createItem')}
                                 </button>
                             </div>
                         </form>

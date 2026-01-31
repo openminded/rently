@@ -6,16 +6,24 @@ import path from 'path';
 // Define model order for dependencies
 // For Restore/Deletion: Delete in reverse order of creation
 const models = [
+    'Broadcast', // Depends on BroadcastTemplate
     'Fine', 'Payment', 'TransactionItem', 'Transaction', // Transactions depends on Customer
-    'LaundryLog', 'ItemInstance', 'ItemVariant', 'ItemImage', 'Item', // Items
-    'Customer', 'Category', 'Brand', 'Color', 'Size', 'PaymentMethod', 'ViolationType', 'AppSetting', 'User'
+    'Expense', // Expense might link to User, LaundryBatch, or ExpenseCategory
+    'LaundryLog', // LaundryLog depends on LaundryBatch (sometimes) and ItemInstance
+    'LaundryBatch', // LaundryBatch depends on LaundryPartner
+    'LaundryPartner',
+    'ItemInstance', 'ItemVariant', 'ItemImage', 'Item', // Items
+    'Customer', 'Category', 'Brand', 'Color', 'Size', 'PaymentMethod', 'ViolationType',
+    'ExpenseCategory', 'DepositVariant', 'BroadcastTemplate', 'AppSetting', 'User'
 ];
 
 // For Restore/Creation: Create in this order
 const creationOrder = [
     'User', 'AppSetting', 'ViolationType', 'PaymentMethod', 'Size', 'Color', 'Brand', 'Category', 'Customer',
-    'Item', 'ItemImage', 'ItemVariant', 'ItemInstance', 'LaundryLog',
-    'Transaction', 'TransactionItem', 'Payment', 'Fine'
+    'ExpenseCategory', 'DepositVariant', 'BroadcastTemplate',
+    'Item', 'ItemImage', 'ItemVariant', 'ItemInstance',
+    'LaundryPartner', 'LaundryBatch', 'LaundryLog',
+    'Transaction', 'TransactionItem', 'Payment', 'Fine', 'Expense', 'Broadcast'
 ];
 
 export const backupController = {
@@ -100,26 +108,36 @@ export const backupController = {
         }
     },
 
-    // 3. RESET: Clear All Data
+    // 3. RESET: Clear Operational Data Only (Preserves Master Data & Settings)
+    // IMPORTANT: This function only deletes operational/transactional data.
+    // Master data from Settings menu is PRESERVED (Users, Categories, Brands, Colors, Sizes, etc.)
+    // Media assets in /uploads/ directory are also preserved.
     resetData: async (req: Request, res: Response) => {
         try {
+            // Only delete operational data, NOT master data
+            const operationalModels = [
+                'Broadcast',
+                'Fine', 'Payment', 'TransactionItem', 'Transaction',
+                'Expense',
+                'LaundryLog', 'LaundryBatch',
+                'ItemInstance', 'ItemVariant', 'ItemImage', 'Item',
+                'Customer'
+            ];
+
             await prisma.$transaction(async (tx) => {
-                // Delete all data (Respect Foreign Keys)
-                for (const modelName of models) {
+                // Delete only operational data (Respects Foreign Keys)
+                for (const modelName of operationalModels) {
                     const modelKey = modelName.charAt(0).toLowerCase() + modelName.slice(1);
                     // @ts-ignore
                     if (tx[modelKey]) {
                         // @ts-ignore
                         await tx[modelKey].deleteMany();
-
-                        // Reset Auto Increment? (Optional, specific to MySQL. Requires raw query)
-                        // await tx.$executeRawUnsafe(`ALTER TABLE ${modelName} AUTO_INCREMENT = 1`); 
-                        // Note: Prisma table names might differ (e.g. PascalCase vs snake_case). 
-                        // Skipping auto-increment reset to avoid complexity issues with table naming.
                     }
                 }
             });
-            res.json({ message: 'All data has been reset.' });
+            res.json({
+                message: 'Operational data has been reset. Master data and settings are preserved.'
+            });
         } catch (error) {
             console.error("Reset Failed:", error);
             res.status(500).json({ error: 'Failed to reset data' });

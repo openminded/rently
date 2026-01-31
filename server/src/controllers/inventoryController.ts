@@ -1,5 +1,6 @@
 import type { Request, Response } from 'express';
 import prisma from '../prisma.js';
+import { ItemStatus } from '@prisma/client';
 
 export const inventoryController = {
     // Items (The product definition)
@@ -61,31 +62,34 @@ export const inventoryController = {
             const { id } = req.params;
             const { name, categoryId, brandId, rentalPrice, description, imageUrls } = req.body;
 
+            console.log(`[UpdateItem] ID: ${id}, Body keys: ${Object.keys(req.body)}, ImageUrls: ${imageUrls?.length}`);
+
+            const updateData: any = {};
+            if (name) updateData.name = name;
+            if (categoryId) updateData.categoryId = Number(categoryId);
+            if (brandId) updateData.brandId = Number(brandId);
+            if (rentalPrice) updateData.rentalPrice = Number(rentalPrice);
+            if (description !== undefined) updateData.description = description;
+
+            // Handle Images
+            if (imageUrls && Array.isArray(imageUrls) && imageUrls.length > 0) {
+                updateData.images = {
+                    create: imageUrls.map((url: string) => ({
+                        url,
+                        isPrimary: false
+                    }))
+                };
+            }
+
             // Basic update
             const item = await prisma.item.update({
                 where: { id: Number(id) },
-                data: {
-                    name,
-                    categoryId: Number(categoryId),
-                    brandId: Number(brandId),
-                    rentalPrice: Number(rentalPrice),
-                    description,
-                    // If items are added, we just create new ItemImages. 
-                    // Deletion of specific old images should ideally be a separate endpoint or handled via a 'deletedImageIds' list, 
-                    // but for now let's just allow ADDING via update, or we can clear and replace if that's the intention (dangerous).
-                    // Better approach for now: New images from upload are APPENDED.
-                    images: {
-                        create: (imageUrls as string[])?.map((url) => ({
-                            url,
-                            isPrimary: false
-                        })) || []
-                    }
-                },
+                data: updateData,
                 include: { images: true }
             });
             res.json(item);
         } catch (error) {
-            console.error(error);
+            console.error("[UpdateItem] Error:", error);
             res.status(500).json({ error: 'Failed to update item' });
         }
     },
@@ -102,29 +106,87 @@ export const inventoryController = {
 
     getItems: async (req: Request, res: Response) => {
         try {
-            const items = await prisma.item.findMany({
-                include: {
-                    category: true,
-                    brand: true,
-                    images: true, // Include images
-                    variants: {
-                        include: {
-                            size: true,
-                            color: true,
-                            _count: {
-                                select: {
-                                    instances: {
-                                        where: { status: 'AVAILABLE' }
-                                    }
+            const hasPagination = req.query.page !== undefined || req.query.limit !== undefined;
+
+            const page = parseInt(req.query.page as string) || 1;
+            const limit = parseInt(req.query.limit as string) || 20;
+            const search = (req.query.search as string) || '';
+            const skip = (page - 1) * limit;
+
+            const where: any = {};
+            if (search) {
+                where.OR = [
+                    { name: { contains: search } },
+                    { description: { contains: search } }
+                ];
+            }
+
+            const include = {
+                category: true,
+                brand: true,
+                images: true,
+                variants: {
+                    include: {
+                        size: true,
+                        color: true,
+                        instances: {
+                            select: { status: true }
+                        },
+                        _count: {
+                            select: {
+                                instances: {
+                                    where: { status: ItemStatus.AVAILABLE }
                                 }
                             }
-                        },
+                        }
                     },
                 },
-                orderBy: { createdAt: 'desc' }
+            };
+
+            // Filters
+            if (req.query.categoryId) {
+                // @ts-ignore
+                const catId = parseInt(req.query.categoryId);
+                if (!isNaN(catId) && catId > 0) {
+                    where.categoryId = catId;
+                }
+            }
+
+            if (req.query.onlyWithImages === 'true') {
+                where.images = {
+                    some: {} // At least one image
+                };
+            }
+
+            if (!hasPagination && !search && !req.query.categoryId && !req.query.onlyWithImages) {
+                // Return simple array for backward compatibility (e.g., Showcase, Catalog)
+                const items = await prisma.item.findMany({
+                    include,
+                    orderBy: { createdAt: 'desc' }
+                });
+                return res.json(items);
+            }
+
+            const [items, total] = await Promise.all([
+                prisma.item.findMany({
+                    where,
+                    include,
+                    orderBy: { createdAt: 'desc' },
+                    skip,
+                    take: limit
+                }),
+                prisma.item.count({ where })
+            ]);
+
+            res.json({
+                items,
+                total,
+                page,
+                limit,
+                hasMore: total > skip + items.length
             });
-            res.json(items);
         } catch (error) {
+            console.error("Fetch items error:", error);
             res.status(500).json({ error: 'Failed to fetch items' });
         }
     },

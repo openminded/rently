@@ -1,14 +1,16 @@
 import React from 'react';
 import MasterGenericPage from './MasterGenericPage';
+import { useLanguage } from '../../context/LanguageContext';
 
 export default function Colors() {
+    const { t } = useLanguage();
     return (
         <MasterGenericPage
-            title="Colors"
-            description="Manage product colors"
+            title={t('master.colors.title')}
+            description={t('master.colors.desc')}
             endpoint="colors"
             columns={[
-                { key: 'name', label: 'Name' },
+                { key: 'name', label: t('common.name') },
                 {
                     key: 'hexCode', label: 'Preview', render: (i: any) => (
                         <div className="flex items-center gap-2">
@@ -19,7 +21,7 @@ export default function Colors() {
                 }
             ]}
             fields={[
-                { name: 'name', label: 'Color Name', required: true },
+                { name: 'name', label: t('common.name'), required: true },
                 { name: 'hexCode', label: 'Hex Code (e.g. #FF0000)', type: 'color', required: true }
             ]}
         />

@@ -1,121 +1,122 @@
+
 import type { Request, Response } from 'express';
-import prisma from '../prisma.js';
+import { PrismaClient } from '@prisma/client';
 
-// Generic handler for fetching all items
-export const getAll = (model: any) => async (req: Request, res: Response) => {
-    try {
-        const items = await model.findMany();
-        res.json(items);
-    } catch (error) {
-        res.status(500).json({ error: 'Failed to fetch data' });
-    }
-};
+const prisma = new PrismaClient();
 
-// Generic handler for creating an item
-export const create = (model: any) => async (req: Request, res: Response) => {
-    try {
-        const item = await model.create({
-            data: req.body,
-        });
-        res.status(201).json(item);
-    } catch (error) {
-        res.status(500).json({ error: 'Failed to create item' });
-    }
-};
-
-export const update = (model: any) => async (req: Request, res: Response) => {
-    try {
-        const { id } = req.params;
-        const item = await model.update({
-            where: { id: Number(id) },
-            data: req.body,
-        });
-        res.json(item);
-    } catch (error) {
-        res.status(500).json({ error: 'Failed to update item' });
-    }
-};
-
-export const deleteItem = (model: any) => async (req: Request, res: Response) => {
-    try {
-        const { id } = req.params;
-        await model.delete({
-            where: { id: Number(id) },
-        });
-        res.json({ message: 'Item deleted successfully' });
-    } catch (error) {
-        res.status(500).json({ error: 'Failed to delete item' });
-    }
-};
-
-// Specialized handler for customer creation with file
-const createCustomer = async (req: Request, res: Response) => {
-    try {
-        const data = req.body;
-
-        // Add image path if file exists
-        if (req.file) {
-            data.identityCardImage = `/uploads/customers/${req.file.filename}`;
+// Generic helper for basic CRUD
+const createCrud = (modelName: string, orderBy: any = { id: 'asc' }) => ({
+    getAll: async (req: Request, res: Response) => {
+        try {
+            // @ts-ignore
+            const items = await prisma[modelName].findMany({ orderBy });
+            res.json(items);
+        } catch (error) {
+            res.status(500).json({ error: `Failed to fetch ${modelName}` });
         }
-
-        const item = await prisma.customer.create({
-            data: data
-        });
-        res.status(201).json(item);
-    } catch (error) {
-        console.error("Create Customer Error:", error);
-        res.status(500).json({ error: 'Failed to create customer' });
+    },
+    create: async (req: Request, res: Response) => {
+        try {
+            // @ts-ignore
+            const item = await prisma[modelName].create({ data: req.body });
+            res.status(201).json(item);
+        } catch (error) {
+            res.status(500).json({ error: `Failed to create ${modelName}` });
+        }
+    },
+    update: async (req: Request, res: Response) => {
+        try {
+            const { id } = req.params;
+            // @ts-ignore
+            const item = await prisma[modelName].update({
+                where: { id: parseInt(id) },
+                data: req.body
+            });
+            res.json(item);
+        } catch (error) {
+            res.status(500).json({ error: `Failed to update ${modelName}` });
+        }
+    },
+    delete: async (req: Request, res: Response) => {
+        try {
+            const { id } = req.params;
+            // @ts-ignore
+            await prisma[modelName].delete({ where: { id: parseInt(id) } });
+            res.json({ message: 'Deleted' });
+        } catch (error) {
+            res.status(500).json({ error: `Failed to delete ${modelName}` });
+        }
     }
-};
+});
+
+// Specific controllers can override or extend
+const depositVariantsController = {
+    getAll: async (req: Request, res: Response) => {
+        try {
+            const items = await prisma.depositVariant.findMany({
+                where: { active: true },
+                orderBy: { amount: 'asc' }
+            });
+            res.json(items);
+        } catch (error) {
+            res.status(500).json({ error: 'Failed to fetch deposit variants' });
+        }
+    },
+    create: async (req: Request, res: Response) => {
+        try {
+            const { name, amount } = req.body;
+            const item = await prisma.depositVariant.create({
+                data: { name, amount: parseFloat(amount) }
+            });
+            res.status(201).json(item);
+        } catch (error) {
+            res.status(500).json({ error: 'Failed to create deposit variant' });
+        }
+    },
+    update: async (req: Request, res: Response) => {
+        try {
+            const { id } = req.params;
+            const { name, amount, active } = req.body;
+            const item = await prisma.depositVariant.update({
+                where: { id: parseInt(id) },
+                data: {
+                    name,
+                    amount: amount !== undefined ? parseFloat(amount) : undefined,
+                    active
+                }
+            });
+            res.json(item);
+        } catch (error) {
+            res.status(500).json({ error: 'Failed to update deposit variant' });
+        }
+    },
+    delete: async (req: Request, res: Response) => {
+        try {
+            const { id } = req.params;
+            await prisma.depositVariant.update({
+                where: { id: parseInt(id) },
+                data: { active: false }
+            });
+            res.json({ message: 'Deleted' });
+        } catch (error) {
+            res.status(500).json({ error: 'Failed to delete deposit variant' });
+        }
+    }
+}
 
 export const masterController = {
-    categories: {
-        getAll: getAll(prisma.category),
-        create: create(prisma.category),
-        update: update(prisma.category),
-        delete: deleteItem(prisma.category),
-    },
-    brands: {
-        getAll: getAll(prisma.brand),
-        create: create(prisma.brand),
-        update: update(prisma.brand),
-        delete: deleteItem(prisma.brand),
-    },
-    colors: {
-        getAll: getAll(prisma.color),
-        create: create(prisma.color),
-        update: update(prisma.color),
-        delete: deleteItem(prisma.color),
-    },
-    sizes: {
-        getAll: getAll(prisma.size),
-        create: create(prisma.size),
-        update: update(prisma.size),
-        delete: deleteItem(prisma.size),
-    },
-    paymentMethods: {
-        getAll: getAll(prisma.paymentMethod),
-        create: create(prisma.paymentMethod),
-        update: update(prisma.paymentMethod),
-        delete: deleteItem(prisma.paymentMethod),
-    },
-    violationTypes: {
-        getAll: getAll(prisma.violationType),
-        create: create(prisma.violationType),
-        update: update(prisma.violationType),
-        delete: deleteItem(prisma.violationType),
-    },
-    customers: {
-        getAll: getAll(prisma.customer),
-        create: create(prisma.customer),
-        createWithImage: createCustomer,
-        update: update(prisma.customer),
-        delete: deleteItem(prisma.customer),
-    },
-    laundryPartners: {
-        getAll: getAll(prisma.laundryPartner),
-        create: create(prisma.laundryPartner),
-        update: update(prisma.laundryPartner),
-        delete: deleteItem(prisma.laundryPartner),
-    }
+    categories: createCrud('category', { name: 'asc' }),
+    brands: createCrud('brand', { name: 'asc' }),
+    colors: createCrud('color', { name: 'asc' }),
+    sizes: createCrud('size', { id: 'asc' }), // Fixed: Size model doesn't have 'order' field
+    paymentMethods: createCrud('paymentMethod', { name: 'asc' }),
+    violationTypes: createCrud('violationType', { name: 'asc' }),
+    customers: createCrud('customer', { name: 'asc' }),
+    laundryPartners: createCrud('laundryPartner', { name: 'asc' }),
+
+    // Deposit Variants (Custom Logic)
+    getDepositVariants: depositVariantsController.getAll,
+    createDepositVariant: depositVariantsController.create,
+    updateDepositVariant: depositVariantsController.update,
+    deleteDepositVariant: depositVariantsController.delete
 };

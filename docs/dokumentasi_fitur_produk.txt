@@ -1,0 +1,132 @@
+# DOKUMENTASI LENGKAP FITUR APLIKASI RUMAH DINAR
+
+## PENDAHULUAN
+Aplikasi Rumah Dinar adalah sistem manajemen toko sewa busana yang terintegrasi, mencakup Point of Sale (Kasir), Manajemen Inventori, Laporan Keuangan, hingga Landing Page publik yang dinamis.
+
+---
+
+## 1. LANDING PAGE (HALAMAN UTAMA)
+Toko online/katalog digital yang dapat diakses oleh pelanggan umum tanpa login.
+
+**Fitur Utama:**
+*   **Hero Section Dinamis:** Banner utama, judul, dan teks bisa diubah kapan saja melalui menu Pengaturan di panel admin. Mendukung tampilan foto "Before/After" atau model unggulan.
+*   **Koleksi Otomatis (Showcase):** Menampilkan daftar produk yang tersedia secara otomatis. 
+    *   *Sinkronisasi Kategori:* Tab kategori (misal: Wisuda, Pernikahan) otomatis muncul sesuai dengan Master Data Kategori yang ada di sistem.
+    *   *Smart Filter:* Sistem otomatis hanya menampilkan produk yang memiliki foto. Barang tanpa foto tidak akan muncul untuk menjaga estetika.
+*   **Toggle On/Off:** Pemilik toko bisa mematikan/menyalakan fitur tertentu (misal: menyembunyikan bagian "Promo" jika sedang tidak ada promo) atau bahkan mematikan seluruh Landing Page (Mode Maintenance) melalui Admin Panel.
+*   **WhatsApp Floating Button:** Tombol chat melayang yang terhubung langsung ke nomor WhatsApp admin untuk memudahkan pelanggan bertanya. Nomor bisa diubah di pengaturan.
+
+**Cara Pakai (Admin):**
+1.  Masuk ke menu **Settings > Landing Page**.
+2.  Ubah teks judul, deskripsi, upload foto banner baru.
+3.  Gunakan tombol "Switch" untuk menyalakan/mematikan bagian Hero, Promo, atau Fitur.
+4.  Klik "Simpan Perubahan". Perubahan langsung terlihat oleh pelanggan (Real-time).
+
+---
+
+## 2. POINT OF SALE (POS / KASIR)
+Pusat operasional penyewaan harian.
+
+**Fitur Utama:**
+*   **Mode Transaksi Fleksibel:**
+    *   *Booking (DP):* Untuk pelanggan yang membooking baju untuk tanggal mendatang. Wajib membayar DP (Down Payment).
+    *   *Direct Pickup (Langsung Ambil):* Untuk pelanggan yang datang, bayar lunas, dan langsung bawa barang. Wajib pembayaran penuh.
+    *   *Immediate:* Mode cepat untuk transaksi non-sewa (jika ada).
+*   **Cek Stok Real-time:** Saat memilih tanggal sewa (Start & End Date), sistem otomatis mengecek apakah baju tersebut tersedia di tanggal itu. Jika "Out of Stock", kasir tidak bisa memproses.
+*   **Manajemen Deposit:** Kolom khusus untuk memasukkan jenis jaminan (KTP/Uang Tunai/SIM) yang dipilih dari Master Data. 
+*   **Admin Fee Otomatis:** Biaya admin bisa disetting apakah "Per Transaksi" (flat) atau "Per Barang".
+*   **Invoice Digital:** Setelah transaksi sukses, invoice otomatis tercetak atau bisa dikirim digital.
+
+**Flow Transaksi:**
+1.  Pilih Produk dari katalog (bisa cari nama/kode).
+2.  Isi data Customer (atau pilih dari daftar Customer Lama).
+3.  Tentukan Tanggal Sewa & Tanggal Kembali.
+4.  Pilih Metode Transaksi (Booking/Direct).
+5.  Pilih Metode Pembayaran & Deposit.
+6.  Klik "Process". Stok otomatis berkurang untuk tanggal tersebut.
+
+---
+
+## 3. MANAJEMEN INVENTORI (GUDANG)
+Tempat mengatur data produk secara mendetail.
+
+**Fitur Utama:**
+*   **Sistem Varian:** Satu produk (misal: "Kebaya Kutu Baru") bisa memiliki banyak varian (Size S, M, L) dan Warna (Merah, Kuning).
+*   **SKU Generator:** Setiap fisik baju memiliki kode unik (SKU) sendiri untuk pelacakan yang akurat (misal: KBY-Mrh-S-001).
+*   **Upload Foto:** Mendukung upload foto produk untuk ditampilkan di Landing Page & POS.
+*   **Status Barang:**
+    *   *Available:* Siap sewa.
+    *   *Rented:* Sedang dibawa pelanggan.
+    *   *In Laundry:* Sedang dicuci.
+    *   *Damaged/Lost:* Rusak atau hilang (stok berkurang).
+
+**Cara Pakai:**
+1.  Masuk menu **Inventory**.
+2.  Bisa "Tambah Item Baru" atau edit yang sudah ada.
+3.  Di dalam item, bisa tambah varian (Size/Warna) dan jumlah stok per varian.
+
+---
+
+## 4. LAUNDRY MANAGEMENT
+Fitur untuk melacak baju kotor dan bersih.
+
+**Fitur Utama:**
+*   **Partner Laundry:** Database tempat laundry rekanan.
+*   **In-Process Tracking:** Mencatat baju mana saja yang dikirim ke laundry, kapan dikirim, dan estimasi selesai.
+*   **Restock Otomatis:** Saat baju ditandai "Selesai Laundry", status stok otomatis berubah kembali menjadi "Available".
+
+---
+
+## 5. PENGEMBALIAN (RETURNS)
+Menu untuk memproses baju yang kembali dari pelanggan.
+
+**Fitur Utama:**
+*   **Denda Keterlambatan:** Sistem menghitung otomatis jika pengembalian melebihi tanggal sewa (Overdue).
+*   **Cek Kondisi:** Kasir bisa menandai kondisi baju saat kembali (Baik/Rusak/Kotor).
+*   **Refund Deposit:** Konfirmasi pengembalian jaminan pelanggan.
+
+---
+
+## 6. WHATSAPP BROADCAST (CRM)
+Fitur pemasaran untuk mengirim pesan massal ke pelanggan.
+
+**Fitur Utama:**
+*   **Filter Target:** Kirim pesan ke semua pelanggan, atau spesifik (misal: Pelanggan yang menyewa bulan lalu).
+*   **Template Pesan:** Simpan template promosi agar tidak perlu ketik ulang.
+*   **Image Attachment:** Bisa kirim pesan gambar (brosur promo).
+*   **Log Pengiriman:** Laporan status pengiriman (Terkirim/Gagal).
+
+---
+
+## 7. DASHBOARD & LAPORAN
+Pusat data untuk pemilik bisnis.
+
+**Fitur Utama:**
+*   **Ringkasan Harian:** Total omset hari ini, barang keluar, barang harus kembali hari ini.
+*   **Grafik Tren:** Melihat kenaikan/penurunan penyewaan.
+*   **Stok Alert:** Peringatan jika ada barang yang stoknya menipis atau belum kembali (Late).
+
+---
+
+## 8. MASTER DATA
+Pengaturan dasar sistem.
+
+**Isi Master Data:**
+*   **Kategori:** Jenis busana (Pernikahan, Kasual, Adat).
+*   **Warna & Ukuran:** Standarisasi input varian.
+*   **Tipe Denda:** Mengatur nominal denda kerusakan/keterlambatan.
+*   **Metode Pembayaran:** Transfer, Cash, QRIS, dll.
+*   **Rekanan Laundry:** Data vendor laundry.
+
+---
+
+## 9. PENGATURAN (SETTINGS)
+Konfigurasi sistem tanpa perlu coding.
+
+**Fitur:**
+*   **General:** Ubah Bahasa (Indo/Inggris), Atur Mode Biaya Admin.
+*   **Landing Page Config:** Atur tampilan website publik (seperti dijelaskan di poin 1).
+*   **Backup:** Fitur untuk download data database sebagai cadangan.
+
+---
+*Dokumen ini dibuat otomatis oleh Sistem Rumah Dinar v1.0*

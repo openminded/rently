@@ -51,4 +51,10 @@ router.post('/laundry-partners', masterController.laundryPartners.create);
 router.put('/laundry-partners/:id', masterController.laundryPartners.update);
 router.delete('/laundry-partners/:id', masterController.laundryPartners.delete);
 
+// Deposit Variants
+router.get('/deposit-variants', masterController.getDepositVariants);
+router.post('/deposit-variants', masterController.createDepositVariant);
+router.put('/deposit-variants/:id', masterController.updateDepositVariant);
+router.delete('/deposit-variants/:id', masterController.deleteDepositVariant);
+
 export default router;

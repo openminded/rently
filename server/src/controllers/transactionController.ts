@@ -6,7 +6,7 @@ export const transactionController = {
     createConfig: async (req: Request, res: Response) => {
         // Updated logic for Booking vs Immediate
         try {
-            const { type, customerId, pickupDate, returnPlanDate, items, payment } = req.body;
+            const { type, customerId, pickupDate, returnPlanDate, items, payment, adminFee = 0, taxRate = 0, taxAmount = 0 } = req.body;
 
             // 1. Gather all instance SKUs to be rented/reserved
             const assignedSkus: string[] = [];
@@ -68,14 +68,30 @@ export const transactionController = {
                 }
 
                 // Payment Status Logic
+                // Total to Pay = Rental Price + Deposit (if any)
+                const depositVal = req.body.depositAmount ? parseFloat(req.body.depositAmount) : 0;
+                // If deposit is included in "payment" logic, we need to know if the "Total Bill" includes deposit or not.
+                // Usually Deposit is separate. 
+                // Let's assume Total Amount = Rental + Deposit.
+                // But generally Deposit is refundable, not "Revenue".
+                // Allow TotalAmount to be just Rental. Deposit is stored in depositAmount.
+                // But user has to PAY (Rental + Deposit).
+                // Frontend POS usually sums them up.
+                // So checking `paid >= totalAmount` might be tricky if `totalAmount` doesn't include deposit.
+
+                // DECISION: `totalAmount` should ONLY be the Rental/Item Costs (Revenue).
+                // `depositAmount` is separate.
+                // BUT `paidAmount` comes from user paying the SUM.
+                // So `paid >= totalAmount + depositAmount` is the check for "PAID".
+
+                const totalObligation = totalAmount + depositVal + parseFloat(adminFee as string || '0') + parseFloat(taxAmount as string || '0');
+
                 const paid = payment ? parseFloat(payment.amount) : 0;
                 let payStatus = 'UNPAID';
-                if (paid >= totalAmount) payStatus = 'PAID';
+                if (paid >= totalObligation) payStatus = 'PAID';
                 else if (paid > 0) payStatus = 'PARTIAL';
 
                 // Transaction Status Logic
-                // If IMMEDIATE -> RENTED (Active)
-                // If BOOKING -> BOOKED (Pending Pickup)
                 const txStatus = type === 'IMMEDIATE' ? 'RENTED' : 'BOOKED';
 
                 // Create Header
@@ -83,11 +99,17 @@ export const transactionController = {
                     data: {
                         type: type || 'BOOKING',
                         customerId,
+                        userId: req.user?.id, // Track who created the booking
                         pickupDate: new Date(pickupDate),
                         returnPlanDate: new Date(returnPlanDate),
                         status: txStatus as any, // Cast to any to avoid Enum TS issues with provisional types
                         totalAmount: totalAmount,
+                        depositAmount: depositVal,
+                        depositStatus: depositVal > 0 ? 'HELD' : null,
                         paidAmount: paid,
+                        adminFee: parseFloat(adminFee as string || '0'),
+                        taxRate: parseFloat(taxRate as string || '0'),
+                        taxAmount: parseFloat(taxAmount as string || '0'),
                         paymentStatus: payStatus as any,
                         items: {
                             create: transactionItemsData
@@ -96,7 +118,8 @@ export const transactionController = {
                             create: {
                                 amount: paid,
                                 paymentMethodId: payment.methodId,
-                                note: payment.note
+                                note: payment.note,
+                                createdById: req.user?.id // Track payment receiver
                             }
                         } : undefined
                     },
@@ -136,7 +159,7 @@ export const transactionController = {
             const { payment } = req.body;
 
             const transaction = await prisma.transaction.findUnique({
-                where: { id: parseInt(id) }
+                where: { id: parseInt((id as string) || '0') }
             });
 
             if (!transaction) return res.status(404).json({ error: 'Transaction not found' });
@@ -148,7 +171,8 @@ export const transactionController = {
                         transactionId: transaction.id,
                         amount: parseFloat(payment.amount),
                         paymentMethodId: payment.methodId,
-                        note: payment.note || 'Manual Payment'
+                        note: payment.note || 'Manual Payment',
+                        createdById: req.user?.id // Track who took the payment
                     }
                 });
 
@@ -187,7 +211,7 @@ export const transactionController = {
             const { payment } = req.body; // Optional additional payment
 
             const transaction = await prisma.transaction.findUnique({
-                where: { id: parseInt(id) },
+                where: { id: parseInt((id as string) || '0') },
                 include: { payments: true, items: { include: { itemInstance: true } } }
             });
 
@@ -229,7 +253,8 @@ export const transactionController = {
                         status: 'RENTED',
                         paidAmount: currentPaid,
                         paymentStatus: 'PAID',
-                        pickupDate: new Date() // Actual pickup time
+                        pickupDate: new Date(), // Actual pickup time
+                        pickedUpById: req.user?.id // Track who processed the pickup
                     }
                 });
 
@@ -302,13 +327,33 @@ export const transactionController = {
                 }
 
                 // 3. Update Transaction (Status, Dates, Amounts)
+                // Deposit Logic:
+                const depositAmount = transaction.depositAmount || 0;
+                let usedDeposit = 0;
+                let newDepositStatus = transaction.depositStatus;
+
+                if (depositAmount > 0 && totalFineAmount > 0) {
+                    usedDeposit = Math.min(depositAmount, totalFineAmount);
+                    // Determine Status
+                    if (usedDeposit === depositAmount) newDepositStatus = 'DEDUCTED'; // Fully used
+                    else newDepositStatus = 'PARTIAL'; // Partially used, some should be refunded
+
+                    // IF fines covered fully by deposit, we consider that fine AMOUNT as paid?
+                    // We increment paidAmount by the usedDeposit effectively transferring it from "Held" to "Paid".
+                } else if (depositAmount > 0 && totalFineAmount === 0) {
+                    newDepositStatus = 'REFUNDED'; // Mark as refunded ideally, or 'TO_REFUND'
+                    // For now, let's assume if no fines, it is REFUNDED logic handled in frontend or cash drawer.
+                    // We mark it REFUNDED here to close the loop.
+                }
+
                 await tx.transaction.update({
                     where: { id: transaction.id },
                     data: {
                         status: 'RETURNED',
                         actualReturnDate: new Date(returnDate || new Date()),
                         totalAmount: { increment: totalFineAmount }, // Add fines to total obligation
-                        paidAmount: { increment: addedPayment }      // Add payment to total paid
+                        paidAmount: { increment: addedPayment + usedDeposit }, // Add payment + used deposit
+                        depositStatus: newDepositStatus
                     }
                 });
 
@@ -364,7 +409,7 @@ export const transactionController = {
         try {
             const { id } = req.params;
             const tx = await prisma.transaction.findUnique({
-                where: { id: parseInt(id) },
+                where: { id: parseInt((id as string) || '0') },
                 include: {
                     customer: true,
                     items: {
@@ -391,7 +436,10 @@ export const transactionController = {
                         include: {
                             violationType: true
                         }
-                    }
+                    },
+                    user: { select: { name: true, username: true } },
+                    pickedUpBy: { select: { name: true, username: true } },
+                    returnedBy: { select: { name: true, username: true } }
                 }
             });
 
@@ -413,7 +461,7 @@ export const transactionController = {
         try {
             await prisma.$transaction(async (tx) => {
                 const transaction = await tx.transaction.findUnique({
-                    where: { id: parseInt(id) },
+                    where: { id: parseInt((id as string) || '0') },
                     include: { items: true }
                 });
 
@@ -421,7 +469,7 @@ export const transactionController = {
 
                 // Update Transaction
                 await tx.transaction.update({
-                    where: { id: parseInt(id) },
+                    where: { id: parseInt((id as string) || '0') },
                     data: {
                         status: 'CANCELLED', // @ts-ignore
                         note: note ? `Invalid: ${note}` : 'Marked as Invalid'

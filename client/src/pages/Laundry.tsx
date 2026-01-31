@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
+import { useLanguage } from '../context/LanguageContext';
 import { DataTable } from '../components/common/DataTable';
 import { Package2, Send, CheckCircle2 } from 'lucide-react';
 
@@ -7,6 +8,7 @@ const API_URL = 'http://localhost:3000/api';
 
 export default function Laundry() {
     const { token } = useAuth();
+    const { t } = useLanguage();
     const [activeTab, setActiveTab] = useState<'in-progress' | 'complete'>('in-progress');
     const [batches, setBatches] = useState<any[]>([]);
     const [waitingItems, setWaitingItems] = useState<any[]>([]);
@@ -51,7 +53,7 @@ export default function Laundry() {
 
     const handleSendToLaundry = async () => {
         if (!batchForm.partnerId || selectedItems.length === 0) {
-            alert('Please select a partner and at least one item');
+            alert(t('laundry.alert.selectItems'));
             return;
         }
 
@@ -71,17 +73,17 @@ export default function Laundry() {
             });
 
             if (res.ok) {
-                alert('Items sent to laundry successfully');
+                alert(t('laundry.alert.sendSuccess'));
                 setShowSendModal(false);
                 setSelectedItems([]);
                 setBatchForm({ partnerId: '', expense: '', note: '' });
                 fetchData();
             } else {
-                alert('Failed to send items to laundry');
+                alert(t('laundry.alert.sendError'));
             }
         } catch (error) {
             console.error('Failed to send to laundry:', error);
-            alert('Failed to send items to laundry');
+            alert(t('laundry.alert.sendError'));
         }
     };
 
@@ -113,7 +115,7 @@ export default function Laundry() {
             }));
 
         if (itemsToProcess.length === 0) {
-            alert("No items selected to complete.");
+            alert(t('laundry.alert.noItems'));
             return;
         }
 
@@ -128,16 +130,16 @@ export default function Laundry() {
             });
 
             if (res.ok) {
-                alert('Batch items marked as completed successfully');
+                alert(t('laundry.alert.completeSuccess'));
                 setShowCompleteModal(false);
                 setCompletingBatch(null);
                 fetchData();
             } else {
-                alert('Failed to complete batch items');
+                alert(t('laundry.alert.completeError'));
             }
         } catch (error) {
             console.error('Failed to complete batch:', error);
-            alert('Failed to complete batch');
+            alert(t('laundry.alert.completeError'));
         }
     };
 
@@ -177,51 +179,51 @@ export default function Laundry() {
                 />
             )
         },
-        { header: 'Log ID', accessorKey: 'id' },
+        { header: t('laundry.table.logId'), accessorKey: 'id' },
         {
-            header: 'Item',
+            header: t('inventory.table.item'),
             accessorKey: 'itemInstance',
             cell: (item: any) => `${item.itemInstance.itemVariant.item.name} - ${item.itemInstance.itemVariant.size.name} ${item.itemInstance.itemVariant.color.name}`
         },
-        { header: 'SKU', accessorKey: 'itemInstance.sku', cell: (item: any) => item.itemInstance.sku },
+        { header: t('laundry.table.sku'), accessorKey: 'itemInstance.sku', cell: (item: any) => item.itemInstance.sku },
         {
-            header: 'Added',
+            header: t('laundry.table.added'),
             accessorKey: 'createdAt',
             cell: (item: any) => new Date(item.createdAt).toLocaleDateString()
         }
     ];
 
     const batchColumns = [
-        { header: 'Batch ID', accessorKey: 'id' },
-        { header: 'Partner', accessorKey: 'partner.name', cell: (batch: any) => batch.partner.name },
+        { header: t('laundry.table.batchId'), accessorKey: 'id' },
+        { header: t('laundry.modal.complete.partner'), accessorKey: 'partner.name', cell: (batch: any) => batch.partner.name },
         {
-            header: 'Items',
+            header: t('laundry.table.items'),
             accessorKey: 'logs',
-            cell: (batch: any) => `${batch.logs.length} items`
+            cell: (batch: any) => `${batch.logs.length} ${t('laundry.table.items')}`
         },
         {
-            header: 'Expense',
+            header: t('laundry.table.expense'),
             accessorKey: 'expense',
             cell: (batch: any) => `Rp ${batch.expense.toLocaleString()}`
         },
         {
-            header: 'Sent Date',
+            header: t('laundry.table.sentDate'),
             accessorKey: 'sentDate',
             cell: (batch: any) => new Date(batch.sentDate).toLocaleDateString()
         },
         ...(activeTab === 'complete' ? [{
-            header: 'Completed Date',
+            header: t('laundry.table.completedDate'),
             accessorKey: 'completedDate',
             cell: (batch: any) => batch.completedDate ? new Date(batch.completedDate).toLocaleDateString() : '-'
         }] : []),
-        { header: 'Note', accessorKey: 'note', cell: (batch: any) => batch.note || '-' }
+        { header: t('invoice.table.note'), accessorKey: 'note', cell: (batch: any) => batch.note || '-' }
     ];
 
     return (
         <div className="p-8">
             <div className="mb-6">
-                <h1 className="text-2xl font-bold text-gray-900 mb-2">Laundry Management</h1>
-                <p className="text-gray-600">Manage laundry batches and track cleaning status</p>
+                <h1 className="text-2xl font-bold text-gray-900 mb-2">{t('laundry.title')}</h1>
+                <p className="text-gray-600">{t('laundry.subtitle')}</p>
             </div>
 
             {/* Tabs */}
@@ -235,7 +237,7 @@ export default function Laundry() {
                 >
                     <div className="flex items-center gap-2">
                         <Package2 size={18} />
-                        In Progress
+                        {t('laundry.tab.inProgress')}
                     </div>
                 </button>
                 <button
@@ -247,7 +249,7 @@ export default function Laundry() {
                 >
                     <div className="flex items-center gap-2">
                         <CheckCircle2 size={18} />
-                        Complete
+                        {t('laundry.tab.complete')}
                     </div>
                 </button>
             </div>
@@ -258,7 +260,7 @@ export default function Laundry() {
                     {/* Waiting Items */}
                     <div className="bg-white rounded-lg shadow">
                         <div className="p-4 border-b border-gray-200 flex justify-between items-center">
-                            <h2 className="font-semibold text-gray-900">Waiting to Send ({waitingItems.length})</h2>
+                            <h2 className="font-semibold text-gray-900">{t('laundry.waiting')} ({waitingItems.length})</h2>
                             {waitingItems.length > 0 && (
                                 <button
                                     onClick={() => setShowSendModal(true)}
@@ -269,7 +271,7 @@ export default function Laundry() {
                                         }`}
                                 >
                                     <Send size={18} />
-                                    Send Selected ({selectedItems.length})
+                                    {t('laundry.action.sendSelected', { count: selectedItems.length })}
                                 </button>
                             )}
                         </div>
@@ -283,7 +285,7 @@ export default function Laundry() {
                     {/* In Progress Batches */}
                     <div className="bg-white rounded-lg shadow">
                         <div className="p-4 border-b border-gray-200">
-                            <h2 className="font-semibold text-gray-900">In Progress Batches ({batches.length})</h2>
+                            <h2 className="font-semibold text-gray-900">{t('laundry.activeBatches')} ({batches.length})</h2>
                         </div>
                         <DataTable
                             data={batches}
@@ -294,7 +296,7 @@ export default function Laundry() {
                                     onClick={() => handleOpenCompleteModal(batch)}
                                     className="text-green-600 hover:text-green-700 font-medium"
                                 >
-                                    Mark Complete
+                                    {t('laundry.action.markComplete')}
                                 </button>
                             )}
                         />
@@ -306,7 +308,7 @@ export default function Laundry() {
             {activeTab === 'complete' && (
                 <div className="bg-white rounded-lg shadow">
                     <div className="p-4 border-b border-gray-200">
-                        <h2 className="font-semibold text-gray-900">Completed Batches ({batches.length})</h2>
+                        <h2 className="font-semibold text-gray-900">{t('laundry.completedBatches')} ({batches.length})</h2>
                     </div>
                     <DataTable
                         data={batches}
@@ -320,8 +322,8 @@ export default function Laundry() {
             {showCompleteModal && completingBatch && (
                 <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 overflow-y-auto">
                     <div className="bg-white rounded-lg p-6 w-full max-w-4xl my-8">
-                        <h3 className="text-lg font-semibold mb-2">Complete Laundry Batch #{completingBatch.id}</h3>
-                        <p className="text-sm text-gray-600 mb-4">Partner: {completingBatch.partner.name} | Sent: {new Date(completingBatch.sentDate).toLocaleDateString()}</p>
+                        <h3 className="text-lg font-semibold mb-2">{t('laundry.modal.complete.title', { id: completingBatch.id })}</h3>
+                        <p className="text-sm text-gray-600 mb-4">{t('laundry.modal.complete.partner')}: {completingBatch.partner.name} | {t('laundry.modal.complete.sent')}: {new Date(completingBatch.sentDate).toLocaleDateString()}</p>
 
                         <div className="border rounded-lg overflow-hidden mb-4">
                             <table className="w-full text-sm">
@@ -341,10 +343,10 @@ export default function Laundry() {
                                                 }}
                                             />
                                         </th>
-                                        <th className="px-4 py-2 text-left">Item</th>
-                                        <th className="px-4 py-2 text-left">SKU</th>
-                                        <th className="px-4 py-2 text-left">Status Result</th>
-                                        <th className="px-4 py-2 text-left">Note</th>
+                                        <th className="px-4 py-2 text-left">{t('inventory.table.item')}</th>
+                                        <th className="px-4 py-2 text-left">{t('laundry.table.sku')}</th>
+                                        <th className="px-4 py-2 text-left">{t('laundry.modal.complete.statusResult')}</th>
+                                        <th className="px-4 py-2 text-left">{t('invoice.table.note')}</th>
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y">
@@ -378,14 +380,14 @@ export default function Laundry() {
                                                         disabled={!itemState.selected}
                                                         className={`border rounded px-2 py-1 w-full ${itemState.status === 'NOT_READY' ? 'text-red-600 border-red-300 bg-red-50' : 'text-green-600 border-green-300'}`}
                                                     >
-                                                        <option value="AVAILABLE">✅ Ready (Available)</option>
-                                                        <option value="NOT_READY">❌ Damaged/Lost</option>
+                                                        <option value="AVAILABLE">✅ {t('laundry.modal.complete.ready')}</option>
+                                                        <option value="NOT_READY">❌ {t('laundry.modal.complete.notReady')}</option>
                                                     </select>
                                                 </td>
                                                 <td className="px-4 py-2">
                                                     <input
                                                         type="text"
-                                                        placeholder="Note..."
+                                                        placeholder={t('invoice.table.note') + "..."}
                                                         value={itemState.note}
                                                         onChange={(e) => setCompletionItems(prev => ({
                                                             ...prev,
@@ -410,13 +412,13 @@ export default function Laundry() {
                                 onClick={() => setShowCompleteModal(false)}
                                 className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50"
                             >
-                                Cancel
+                                {t('common.cancel')}
                             </button>
                             <button
                                 onClick={handleConfirmComplete}
                                 className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700"
                             >
-                                Confirm Completion
+                                {t('laundry.modal.complete.confirm')}
                             </button>
                         </div>
                     </div>
@@ -427,12 +429,12 @@ export default function Laundry() {
             {showSendModal && (
                 <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
                     <div className="bg-white rounded-lg p-6 w-full max-w-md">
-                        <h3 className="text-lg font-semibold mb-4">Send to Laundry Partner</h3>
+                        <h3 className="text-lg font-semibold mb-4">{t('laundry.modal.send.title')}</h3>
 
                         <div className="space-y-4">
                             <div>
                                 <label className="block text-sm font-medium text-gray-700 mb-1">
-                                    Laundry Partner *
+                                    {t('laundry.modal.send.partner')} *
                                 </label>
                                 <select
                                     value={batchForm.partnerId}
@@ -440,7 +442,7 @@ export default function Laundry() {
                                     className="w-full border border-gray-300 rounded-lg px-3 py-2"
                                     required
                                 >
-                                    <option value="">Select Partner</option>
+                                    <option value="">{t('common.select')} {t('laundry.modal.complete.partner')}</option>
                                     {partners.map(p => (
                                         <option key={p.id} value={p.id}>{p.name}</option>
                                     ))}
@@ -449,7 +451,7 @@ export default function Laundry() {
 
                             <div>
                                 <label className="block text-sm font-medium text-gray-700 mb-1">
-                                    Expense Amount
+                                    {t('laundry.modal.send.expense')}
                                 </label>
                                 <input
                                     type="number"
@@ -462,19 +464,19 @@ export default function Laundry() {
 
                             <div>
                                 <label className="block text-sm font-medium text-gray-700 mb-1">
-                                    Note
+                                    {t('invoice.table.note')}
                                 </label>
                                 <textarea
                                     value={batchForm.note}
                                     onChange={(e) => setBatchForm({ ...batchForm, note: e.target.value })}
                                     className="w-full border border-gray-300 rounded-lg px-3 py-2"
                                     rows={3}
-                                    placeholder="Optional notes..."
+                                    placeholder={t('laundry.modal.send.notePlaceholder')}
                                 />
                             </div>
 
                             <div className="text-sm text-gray-600">
-                                Sending {selectedItems.length} item(s) to laundry
+                                {t('laundry.modal.send.sendingCount', { count: selectedItems.length })}
                             </div>
                         </div>
 
@@ -483,13 +485,13 @@ export default function Laundry() {
                                 onClick={() => setShowSendModal(false)}
                                 className="flex-1 px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50"
                             >
-                                Cancel
+                                {t('common.cancel')}
                             </button>
                             <button
                                 onClick={handleSendToLaundry}
                                 className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
                             >
-                                Send
+                                {t('pos.process.immediate').split('&')[0].trim()}
                             </button>
                         </div>
                     </div>

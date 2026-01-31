@@ -1,17 +1,19 @@
 import React from 'react';
 import MasterGenericPage from './MasterGenericPage';
+import { useLanguage } from '../../context/LanguageContext';
 
 export default function Brands() {
+    const { t } = useLanguage();
     return (
         <MasterGenericPage
-            title="Brands"
-            description="Manage product brands (e.g. Zara, H&M, Local)"
+            title={t('master.brands.title')}
+            description={t('master.brands.desc')}
             endpoint="brands"
             columns={[
-                { key: 'name', label: 'Name', render: (i: any) => <span className="font-medium">{i.name}</span> }
+                { key: 'name', label: t('common.name'), render: (i: any) => <span className="font-medium">{i.name}</span> }
             ]}
             fields={[
-                { name: 'name', label: 'Brand Name', required: true }
+                { name: 'name', label: t('common.name'), required: true }
             ]}
         />
     );

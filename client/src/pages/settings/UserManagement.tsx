@@ -2,13 +2,14 @@ import { useState, useEffect } from 'react';
 import { Plus, Trash2, Edit2 } from 'lucide-react';
 import { DataTable, type Column } from '../../components/common/DataTable';
 import { useAuth } from '../../context/AuthContext';
+import { useLanguage } from '../../context/LanguageContext';
 
 const API_URL = 'http://localhost:3000/api/users';
 
 export default function UserManagement() {
     const { token } = useAuth();
+    const { t } = useLanguage();
     const [users, setUsers] = useState<any[]>([]);
-    const [loading, setLoading] = useState(true);
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [currentItem, setCurrentItem] = useState<any>(null);
 
@@ -25,12 +26,10 @@ export default function UserManagement() {
             setUsers(Array.isArray(data) ? data : []);
         } catch (error) {
             console.error(error);
-        } finally {
-            setLoading(false);
         }
     };
 
-    const handleSave = async (e: React.FormEvent) => {
+    const handleSave = async (e: any) => {
         e.preventDefault();
         const formData = new FormData(e.target as HTMLFormElement);
         const payload: any = {};
@@ -52,19 +51,19 @@ export default function UserManagement() {
 
             if (!res.ok) {
                 const err = await res.json();
-                throw new Error(err.error || 'Operation failed');
+                throw new Error(err.error || t('common.error'));
             }
 
             setIsModalOpen(false);
             fetchUsers();
-            alert(currentItem ? 'User updated' : 'User created');
+            alert(currentItem ? t('users.alert.updated') : t('users.alert.created'));
         } catch (error: any) {
             alert(error.message);
         }
     };
 
     const handleDelete = async (id: number) => {
-        if (!confirm('Are you sure you want to delete this user?')) return;
+        if (!confirm(t('users.alert.confirmDelete'))) return;
         try {
             const res = await fetch(`${API_URL}/${id}`, {
                 method: 'DELETE',
@@ -81,10 +80,10 @@ export default function UserManagement() {
     };
 
     const columns: Column<any>[] = [
-        { header: 'Name', accessorKey: 'name', sortable: true, className: 'font-medium text-gray-900' },
-        { header: 'Username', accessorKey: 'username', sortable: true },
+        { header: t('common.name'), accessorKey: 'name', sortable: true, className: 'font-medium text-gray-900' },
+        { header: t('auth.username'), accessorKey: 'username', sortable: true },
         {
-            header: 'Role',
+            header: t('users.modal.role'),
             accessorKey: 'role',
             sortable: true,
             cell: (row) => (
@@ -98,7 +97,7 @@ export default function UserManagement() {
             )
         },
         {
-            header: 'Created At',
+            header: t('history.table.date'),
             accessorKey: 'createdAt',
             sortable: true,
             cell: (row) => new Date(row.createdAt).toLocaleDateString()
@@ -110,14 +109,14 @@ export default function UserManagement() {
             <button
                 onClick={() => { setCurrentItem(row); setIsModalOpen(true); }}
                 className="p-1.5 text-blue-600 hover:bg-blue-50 rounded"
-                title="Edit User"
+                title={t('common.editItem')}
             >
                 <Edit2 size={16} />
             </button>
             <button
                 onClick={() => handleDelete(row.id)}
                 className="p-1.5 text-red-600 hover:bg-red-50 rounded"
-                title="Delete User"
+                title={t('common.delete')}
             >
                 <Trash2 size={16} />
             </button>
@@ -128,14 +127,14 @@ export default function UserManagement() {
         <div className="space-y-6">
             <div className="flex items-center justify-between">
                 <div>
-                    <h1 className="text-2xl font-bold text-gray-900">User Management</h1>
-                    <p className="text-gray-500">Create and manage system access accounts.</p>
+                    <h1 className="text-2xl font-bold text-gray-900">{t('users.title')}</h1>
+                    <p className="text-gray-500">{t('users.subtitle')}</p>
                 </div>
                 <button
                     onClick={() => { setCurrentItem(null); setIsModalOpen(true); }}
                     className="bg-gray-900 text-white px-4 py-2 rounded-lg flex items-center gap-2 hover:bg-gray-800 transition-colors"
                 >
-                    <Plus size={18} /> Add User
+                    <Plus size={18} /> {t('users.action.addUser')}
                 </button>
             </div>
 
@@ -150,18 +149,18 @@ export default function UserManagement() {
             {isModalOpen && (
                 <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
                     <div className="bg-white rounded-xl shadow-xl p-6 w-full max-w-md">
-                        <h3 className="text-xl font-bold mb-4">{currentItem ? 'Edit User' : 'New User'}</h3>
+                        <h3 className="text-xl font-bold mb-4">{currentItem ? t('common.editItem') : t('common.newItem')}</h3>
                         <form onSubmit={handleSave} className="space-y-4">
                             <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-1">Full Name</label>
+                                <label className="block text-sm font-medium text-gray-700 mb-1">{t('users.modal.fullName')}</label>
                                 <input type="text" name="name" defaultValue={currentItem?.name} required className="w-full p-2 border rounded-lg" />
                             </div>
                             <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-1">Username</label>
+                                <label className="block text-sm font-medium text-gray-700 mb-1">{t('auth.username')}</label>
                                 <input type="text" name="username" defaultValue={currentItem?.username} required disabled={!!currentItem} className="w-full p-2 border rounded-lg disabled:bg-gray-100" />
                             </div>
                             <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-1">Role</label>
+                                <label className="block text-sm font-medium text-gray-700 mb-1">{t('users.modal.role')}</label>
                                 <select name="role" defaultValue={currentItem?.role || 'KASIR'} className="w-full p-2 border rounded-lg">
                                     <option value="KASIR">KASIR</option>
                                     <option value="SUPERVISOR">SUPERVISOR</option>
@@ -171,19 +170,19 @@ export default function UserManagement() {
                             </div>
                             <div>
                                 <label className="block text-sm font-medium text-gray-700 mb-1">
-                                    {currentItem ? 'Reset Password (Optional)' : 'Password'}
+                                    {currentItem ? t('users.modal.resetPassword') : t('users.modal.password')}
                                 </label>
                                 <input
                                     type="password"
                                     name="password"
                                     required={!currentItem}
-                                    placeholder={currentItem ? "Leave empty to keep current" : ""}
+                                    placeholder={currentItem ? t('users.modal.passwordHint') : ""}
                                     className="w-full p-2 border rounded-lg"
                                 />
                             </div>
                             <div className="flex justify-end gap-3 mt-6">
-                                <button type="button" onClick={() => setIsModalOpen(false)} className="px-4 py-2 text-gray-600 hover:bg-gray-100 rounded-lg">Cancel</button>
-                                <button type="submit" className="px-4 py-2 bg-gray-900 text-white rounded-lg hover:bg-gray-800">Save</button>
+                                <button type="button" onClick={() => setIsModalOpen(false)} className="px-4 py-2 text-gray-600 hover:bg-gray-100 rounded-lg">{t('common.cancel')}</button>
+                                <button type="submit" className="px-4 py-2 bg-gray-900 text-white rounded-lg hover:bg-gray-800">{t('common.save')}</button>
                             </div>
                         </form>
                     </div>

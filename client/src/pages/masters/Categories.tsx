@@ -1,17 +1,19 @@
 import React from 'react';
 import MasterGenericPage from './MasterGenericPage';
+import { useLanguage } from '../../context/LanguageContext';
 
 export default function Categories() {
+    const { t } = useLanguage();
     return (
         <MasterGenericPage
-            title="Categories"
-            description="Manage product categories (e.g. Kebaya, Jas)"
+            title={t('master.categories.title')}
+            description={t('master.categories.desc')}
             endpoint="categories"
             columns={[
-                { key: 'name', label: 'Name', render: (i: any) => <span className="font-semibold">{i.name}</span> }
+                { key: 'name', label: t('common.name'), render: (i: any) => <span className="font-semibold">{i.name}</span> }
             ]}
             fields={[
-                { name: 'name', label: 'Category Name', required: true }
+                { name: 'name', label: t('common.name'), required: true }
             ]}
         />
     );

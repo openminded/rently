@@ -97,13 +97,22 @@ export const laundryController = {
 
                 // Create expense record
                 if (expense && expense > 0) {
+                    // Find 'Laundry' category
+                    let laundryCategory = await tx.expenseCategory.findUnique({ where: { name: 'Laundry' } });
+
+                    // Fallback if not seeded
+                    if (!laundryCategory) {
+                        laundryCategory = await tx.expenseCategory.create({ data: { name: 'Laundry' } });
+                    }
+
                     await tx.expense.create({
                         data: {
                             type: 'LAUNDRY',
                             amount: expense,
                             description: `Laundry batch #${batch.id} - ${note || 'Sent to partner'}`,
+                            categoryId: laundryCategory.id,
                             referenceId: batch.id,
-                            createdBy: userId
+                            createdById: userId
                         }
                     });
                 }

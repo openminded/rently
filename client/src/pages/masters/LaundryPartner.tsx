@@ -1,18 +1,20 @@
 import MasterGenericPage from './MasterGenericPage';
+import { useLanguage } from '../../context/LanguageContext';
 
 export default function LaundryPartner() {
+    const { t } = useLanguage();
     return (
         <MasterGenericPage
-            title="Laundry Partners"
-            description="Manage laundry service providers"
+            title={t('master.laundryPartners.title')}
+            description={t('master.laundryPartners.desc')}
             endpoint="laundry-partners"
             columns={[
-                { key: 'name', label: 'Partner Name' },
+                { key: 'name', label: t('common.name') },
                 { key: 'phone', label: 'Phone Number' },
                 { key: 'address', label: 'Address' }
             ]}
             fields={[
-                { name: 'name', label: 'Partner Name', required: true },
+                { name: 'name', label: t('common.name'), required: true },
                 { name: 'phone', label: 'Phone Number' },
                 { name: 'address', label: 'Address', type: 'textarea' }
             ]}

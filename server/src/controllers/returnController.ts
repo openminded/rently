@@ -33,7 +33,9 @@ export const returnController = {
                     },
                     fines: {
                         include: { violationType: true }
-                    }
+                    },
+                    returnedBy: { select: { name: true, username: true } }, // Include user who returned
+                    user: { select: { name: true, username: true } } // Include user who booked
                 },
                 orderBy: { pickupDate: 'asc' }
             });
@@ -91,6 +93,24 @@ export const returnController = {
             console.log('Processing return for transaction:', id);
             console.log('Return data:', { returnDate, fines, itemsStatus, payment });
 
+            // 0. Validation: Enforce Full Payment
+            const existingTx = await prisma.transaction.findUnique({ where: { id: Number(id) } });
+            if (!existingTx) return res.status(404).json({ error: 'Transaction not found' });
+
+            const remainingDebt = existingTx.totalAmount - existingTx.paidAmount;
+            const totalFines = (fines || []).reduce((sum: number, f: any) => sum + f.amount, 0);
+            const totalRequired = remainingDebt + totalFines;
+
+            if (totalRequired > 0) {
+                const payAmount = payment?.amount || 0;
+                // Allow small tolerance for floating point? No, standard strict check.
+                if (payAmount < totalRequired) {
+                    return res.status(400).json({
+                        error: `Return requires full payment. Required: ${totalRequired}, Provided: ${payAmount}`
+                    });
+                }
+            }
+
             const result = await prisma.$transaction(async (tx) => {
                 // 1. Update Transaction
                 const transaction = await tx.transaction.update({
@@ -98,6 +118,7 @@ export const returnController = {
                     data: {
                         actualReturnDate: new Date(returnDate),
                         status: 'RETURNED' as any, // Changed from COMPLETED to RETURNED
+                        returnedById: req.user?.id // Track who processed the return
                     }
                 });
 
@@ -143,7 +164,8 @@ export const returnController = {
                             transactionId: Number(id),
                             amount: payment.amount,
                             paymentMethodId: payment.methodId,
-                            note: payment.note || 'Fine/Late Payment'
+                            note: payment.note || 'Fine/Late Payment',
+                            createdById: req.user?.id // Track who took the payment
                         }
                     });
 

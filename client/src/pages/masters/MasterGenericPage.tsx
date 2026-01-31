@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Plus, Trash2, X, Save, Edit2 } from 'lucide-react';
 import { DataTable, type Column } from '../../components/common/DataTable';
 import { useAuth } from '../../context/AuthContext';
+import { useLanguage } from '../../context/LanguageContext';
 
 const API_BASE = 'http://localhost:3000/api/masters';
 
@@ -22,6 +23,7 @@ interface MasterGenericProps {
 
 export default function MasterGenericPage({ title, description, endpoint, columns, fields }: MasterGenericProps) {
     const { hasRole, token } = useAuth();
+    const { t } = useLanguage();
     const [data, setData] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
     const [selectedIds, setSelectedIds] = useState<number[]>([]);
@@ -110,7 +112,7 @@ export default function MasterGenericPage({ title, description, endpoint, column
     };
 
     const handleDelete = async (item: any) => {
-        if (!confirm(`Delete ${item.name || 'item'}?`)) return;
+        if (!confirm(t('common.confirmDelete'))) return;
         try {
             await fetch(`${API_BASE}/${endpoint}/${item.id}`, {
                 method: 'DELETE',
@@ -121,7 +123,7 @@ export default function MasterGenericPage({ title, description, endpoint, column
     };
 
     const handleDeleteSelected = async () => {
-        if (!confirm(`Delete ${selectedIds.length} items?`)) return;
+        if (!confirm(t('common.confirmDelete'))) return;
         // Sequential for simplicity, ideally Promise.all
         for (const id of selectedIds) {
             await fetch(`${API_BASE}/${endpoint}/${id}`, {
@@ -201,12 +203,12 @@ export default function MasterGenericPage({ title, description, endpoint, column
                     onClick={() => { setCurrentItem(null); setIsModalOpen(true); }}
                     className="bg-gray-900 text-white px-4 py-2 rounded-lg flex items-center gap-2 hover:bg-gray-800 transition-colors"
                 >
-                    <Plus size={18} /> Add New
+                    <Plus size={18} /> {t('common.add')}
                 </button>
             </div>
 
             {loading ? (
-                <div className="text-center py-10 text-gray-400">Loading...</div>
+                <div className="text-center py-10 text-gray-400">{t('common.loading')}</div>
             ) : (
                 <DataTable
                     data={data}
@@ -219,7 +221,7 @@ export default function MasterGenericPage({ title, description, endpoint, column
                                 onClick={handleDeleteSelected}
                                 className="flex items-center gap-2 text-red-600 bg-red-50 px-3 py-2 rounded-lg hover:bg-red-100 transition-colors text-sm font-medium"
                             >
-                                <Trash2 size={16} /> Delete ({selectedIds.length})
+                                <Trash2 size={16} /> {t('common.delete')} ({selectedIds.length})
                             </button>
                         ) : null
                     }
@@ -231,7 +233,7 @@ export default function MasterGenericPage({ title, description, endpoint, column
                 <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
                     <div className="bg-white rounded-xl shadow-xl p-6 w-full max-w-md animate-in fade-in zoom-in duration-200">
                         <div className="flex justify-between items-center mb-6">
-                            <h3 className="text-lg font-bold">{currentItem ? 'Edit Item' : 'New Item'}</h3>
+                            <h3 className="text-lg font-bold">{currentItem ? t('common.editItem') : t('common.newItem')}</h3>
                             <button onClick={() => setIsModalOpen(false)} className="text-gray-400 hover:text-gray-900"><X size={20} /></button>
                         </div>
                         <form onSubmit={handleSave} className="space-y-4">
@@ -259,9 +261,9 @@ export default function MasterGenericPage({ title, description, endpoint, column
                                 </div>
                             ))}
                             <div className="flex justify-end gap-3 pt-4">
-                                <button type="button" onClick={() => setIsModalOpen(false)} className="px-4 py-2 text-gray-600 hover:bg-gray-100 rounded-lg">Cancel</button>
+                                <button type="button" onClick={() => setIsModalOpen(false)} className="px-4 py-2 text-gray-600 hover:bg-gray-100 rounded-lg">{t('common.cancel')}</button>
                                 <button type="submit" className="px-4 py-2 bg-gray-900 text-white rounded-lg hover:bg-gray-800 flex items-center gap-2">
-                                    <Save size={16} /> {currentItem ? 'Update' : 'Create'}
+                                    <Save size={16} /> {currentItem ? t('common.update') : t('common.create')}
                                 </button>
                             </div>
                         </form>

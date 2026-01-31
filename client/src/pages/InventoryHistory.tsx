@@ -2,11 +2,13 @@ import React, { useEffect, useState } from 'react';
 import { Package, ClipboardList, Info } from 'lucide-react';
 import { DataTable, type Column } from '../components/common/DataTable';
 import { useAuth } from '../context/AuthContext';
+import { useLanguage } from '../context/LanguageContext';
 
 const API_URL = 'http://localhost:3000/api';
 
 export default function InventoryHistory() {
     const { token } = useAuth();
+    const { t } = useLanguage();
     const [resumeData, setResumeData] = useState([]);
     const [historyData, setHistoryData] = useState([]);
     const [loading, setLoading] = useState(true);
@@ -47,38 +49,38 @@ export default function InventoryHistory() {
 
     // Columns for Resume
     const resumeColumns: Column<any>[] = [
-        { header: 'Product Name', accessorKey: 'itemName', sortable: true, className: 'font-medium text-gray-900' },
+        { header: t('history.table.product'), accessorKey: 'itemName', sortable: true, className: 'font-medium text-gray-900' },
         {
-            header: 'Variant',
+            header: t('history.table.variant'),
             accessorKey: 'size',
             cell: (item) => <span className="text-gray-500">{item.size} - {item.color}</span>
         },
-        { header: 'Total', accessorKey: 'total', sortable: true, className: 'text-center font-bold' },
-        { header: 'Available', accessorKey: 'available', sortable: true, className: 'text-center text-green-700 font-bold bg-green-50' },
-        { header: 'Rented', accessorKey: 'rented', sortable: true, className: 'text-center text-blue-700 font-bold bg-blue-50' },
-        { header: 'Laundry', accessorKey: 'laundry', sortable: true, className: 'text-center text-purple-700 font-bold bg-purple-50' },
-        { header: 'Not Ready', accessorKey: 'notReady', sortable: true, className: 'text-center text-red-700 font-bold bg-red-50' },
+        { header: t('history.table.total'), accessorKey: 'total', sortable: true, className: 'text-center font-bold' },
+        { header: t('inventory.table.available'), accessorKey: 'available', sortable: true, className: 'text-center text-green-700 font-bold bg-green-50' },
+        { header: t('inventory.table.inRent'), accessorKey: 'rented', sortable: true, className: 'text-center text-blue-700 font-bold bg-blue-50' },
+        { header: t('inventory.table.laundry'), accessorKey: 'laundry', sortable: true, className: 'text-center text-purple-700 font-bold bg-purple-50' },
+        { header: t('history.table.notReady'), accessorKey: 'notReady', sortable: true, className: 'text-center text-red-700 font-bold bg-red-50' },
     ];
 
     // Columns for History
     const historyColumns: Column<any>[] = [
         {
-            header: 'Type',
+            header: t('history.table.type'),
             accessorKey: 'type',
             cell: (log) => (
                 <span className={`text-xs font-bold px-2 py-0.5 rounded ${log.type === 'STOCK_ADDED' ? 'bg-green-100 text-green-700' : 'bg-blue-100 text-blue-700'}`}>
-                    {log.type === 'STOCK_ADDED' ? 'Stock Update' : 'Transaction'}
+                    {log.type === 'STOCK_ADDED' ? t('history.log.stockUpdate') : t('history.log.transaction')}
                 </span>
             )
         },
         {
-            header: 'Date',
+            header: t('history.table.date'),
             accessorKey: 'date',
             sortable: true,
             cell: (log) => <span className="text-xs text-gray-500 font-mono">{formatDate(log.date)}</span>
         },
-        { header: 'Description', accessorKey: 'description', className: 'font-medium text-gray-800' },
-        { header: 'Status', accessorKey: 'status', className: 'text-xs text-gray-500' }
+        { header: t('history.table.description'), accessorKey: 'description', className: 'font-medium text-gray-800' },
+        { header: t('history.table.status'), accessorKey: 'status', className: 'text-xs text-gray-500' }
     ];
 
     // Filter History Data by Date
@@ -98,16 +100,16 @@ export default function InventoryHistory() {
     return (
         <div className="p-6 space-y-8">
             <h1 className="text-2xl font-bold flex items-center gap-2">
-                <ClipboardList /> Inventory History & Status
+                <ClipboardList /> {t('history.title')}
             </h1>
 
             {/* Resume Section */}
             <div className="space-y-4">
                 <div className="flex justify-between items-center">
                     <h2 className="font-bold text-lg text-gray-800 flex items-center gap-2">
-                        <Package size={20} /> Product Status Resume
+                        <Package size={20} /> {t('history.resume.title')}
                     </h2>
-                    <button onClick={fetchData} className="text-xs text-blue-600 font-bold hover:underline">Refresh Data</button>
+                    <button onClick={fetchData} className="text-xs text-blue-600 font-bold hover:underline">{t('history.resume.refresh')}</button>
                 </div>
                 <DataTable
                     data={resumeData}
@@ -120,7 +122,7 @@ export default function InventoryHistory() {
             <div className="space-y-4">
                 <div className="flex justify-between items-center">
                     <h2 className="font-bold text-lg text-gray-800 flex items-center gap-2">
-                        <Info size={20} /> Recent Activity Log
+                        <Info size={20} /> {t('history.log.title')}
                     </h2>
                 </div>
                 <DataTable

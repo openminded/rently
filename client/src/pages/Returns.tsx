@@ -1,12 +1,14 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { RotateCcw, AlertTriangle } from 'lucide-react';
 import { DataTable, type Column } from '../components/common/DataTable';
 import { useAuth } from '../context/AuthContext';
+import { useLanguage } from '../context/LanguageContext';
 
 const API_URL = 'http://localhost:3000/api';
 
 export default function Returns() {
     const { token } = useAuth();
+    const { t } = useLanguage();
     const [rentals, setRentals] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
 
@@ -32,9 +34,9 @@ export default function Returns() {
     };
 
     const columns: Column<any>[] = [
-        { header: 'ID', accessorKey: 'id', cell: (row) => <span className="font-medium text-gray-900">#{row.id}</span> },
+        { header: t('transactions.table.id'), accessorKey: 'id', cell: (row) => <span className="font-medium text-gray-900">#{row.id}</span> },
         {
-            header: 'Customer',
+            header: t('transactions.table.customer'),
             accessorKey: 'customer.name',
             cell: (row) => (
                 <div className="flex items-center gap-3">
@@ -49,7 +51,7 @@ export default function Returns() {
             )
         },
         {
-            header: 'Items',
+            header: t('laundry.table.items'),
             accessorKey: 'items',
             cell: (row) => (
                 <div className="space-y-1">
@@ -66,7 +68,7 @@ export default function Returns() {
             )
         },
         {
-            header: 'Return Date',
+            header: t('history.table.date'),
             accessorKey: 'returnPlanDate',
             sortable: true,
             cell: (row) => {
@@ -77,7 +79,7 @@ export default function Returns() {
                         <span className="text-sm text-gray-900">{date.toLocaleDateString()}</span>
                         {isLate && (
                             <span className="flex items-center gap-1 text-xs text-red-600 bg-red-50 px-2 py-0.5 rounded font-medium">
-                                <AlertTriangle size={12} /> Late
+                                <AlertTriangle size={12} /> {t('returns.status.late')}
                             </span>
                         )}
                     </div>
@@ -85,7 +87,7 @@ export default function Returns() {
             }
         },
         {
-            header: 'Status',
+            header: t('transactions.table.status'),
             accessorKey: 'status',
             cell: (row) => (
                 <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium
@@ -100,9 +102,9 @@ export default function Returns() {
         }
     ];
 
-    const actions = (row: any) => (
+    const actions = () => (
         <button className="text-blue-600 hover:text-blue-800 text-sm font-medium flex items-center gap-1 ml-auto">
-            <RotateCcw size={16} /> Process
+            <RotateCcw size={16} /> {t('returns.action.process')}
         </button>
     );
 
@@ -110,13 +112,13 @@ export default function Returns() {
         <div className="space-y-6">
             <div className="flex items-center justify-between">
                 <div>
-                    <h1 className="text-2xl font-bold text-gray-900">Active Rentals & Returns</h1>
-                    <p className="text-gray-500">Manage ongoing rentals and process returns</p>
+                    <h1 className="text-2xl font-bold text-gray-900">{t('returns.title')}</h1>
+                    <p className="text-gray-500">{t('returns.subtitle')}</p>
                 </div>
             </div>
 
             {loading ? (
-                <div className="p-8 text-center text-gray-400">Loading Active Rentals...</div>
+                <div className="p-8 text-center text-gray-400">{t('returns.loading')}</div>
             ) : (
                 <DataTable
                     data={rentals}

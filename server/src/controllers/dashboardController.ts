@@ -62,12 +62,48 @@ export const dashboardController = {
                 where: dateFilter
             });
 
+            // 6. Inventory Monitoring Stats
+            const [totalUnits, availableUnits, maintenanceUnits, rentedUnits] = await Promise.all([
+                prisma.itemInstance.count(),
+                prisma.itemInstance.count({ where: { status: 'AVAILABLE' } }),
+                prisma.itemInstance.count({ where: { status: { in: ['IN_LAUNDRY', 'NOT_READY'] } } }),
+                prisma.itemInstance.count({ where: { status: 'RENTED' } })
+            ]);
+
+            // Out of stock items (Items where no variant has any AVAILABLE instance)
+            // Simplified: Items where ALL instances are NOT AVAILABLE
+            const allItems = await prisma.item.findMany({
+                include: {
+                    variants: {
+                        include: {
+                            instances: {
+                                select: { status: true }
+                            }
+                        }
+                    }
+                }
+            });
+
+            const outOfStockItems = allItems.filter(item => {
+                const instances = item.variants.flatMap(v => v.instances);
+                if (instances.length === 0) return true; // No stock at all
+                return !instances.some(i => i.status === 'AVAILABLE');
+            }).length;
+
             res.json({
                 revenue: payments._sum.amount || 0,
                 activeRentals,
                 newCustomers,
                 lateReturns,
-                recentTransactions
+                recentTransactions,
+                inventory: {
+                    totalUnits,
+                    availableUnits,
+                    maintenanceUnits,
+                    rentedUnits,
+                    outOfStockItems,
+                    availabilityRate: totalUnits > 0 ? (availableUnits / totalUnits) * 100 : 0
+                }
             });
 
         } catch (error) {
@@ -104,14 +140,14 @@ export const dashboardController = {
 
             const revenueMap = new Map<string, number>();
             payments.forEach(p => {
-                const day = p.date.toISOString().split('T')[0];
+                const day = p.date.toISOString().split('T')[0] as string;
                 revenueMap.set(day, (revenueMap.get(day) || 0) + p.amount);
             });
 
             // Fill missing days
             const chartData = [];
             for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
-                const dayStr = d.toISOString().split('T')[0];
+                const dayStr = d.toISOString().split('T')[0] as string;
                 chartData.push({
                     date: dayStr,
                     revenue: revenueMap.get(dayStr) || 0
