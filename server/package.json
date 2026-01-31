@@ -7,6 +7,9 @@
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
     "dev": "nodemon",
+    "build": "tsc",
+    "start": "node dist/index.js",
+    "clean": "rm -rf dist",
     "seed-settings": "tsx prisma/seed_settings.ts"
   },
   "keywords": [],
