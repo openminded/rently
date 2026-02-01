@@ -34,7 +34,7 @@ async function main() {
             type: 'OTHER',
             amount: 1000,
             description: 'Test Expense Blocking User Deletion',
-            createdBy: user.id
+            createdById: user.id
         }
     });
     console.log('Created User and Expense.');

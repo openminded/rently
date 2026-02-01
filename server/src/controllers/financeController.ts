@@ -181,7 +181,7 @@ export const financeController = {
         try {
             const { id } = req.params;
             await prisma.expenseCategory.delete({
-                where: { id: parseInt(id) }
+                where: { id: parseInt((id as string) || '0') }
             });
             res.json({ message: 'Category deleted' });
         } catch (error) {

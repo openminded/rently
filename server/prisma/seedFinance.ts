@@ -94,7 +94,7 @@ async function main() {
                 amount: finalAmount,
                 description: `${item.desc} (Bulan Ini)`,
                 date: randomDate(currentYear, currentMonth),
-                categoryId: categories[item.cat],
+                categoryId: categories[item.cat] ?? null,
                 createdById: userId
             }
         });
@@ -113,7 +113,7 @@ async function main() {
                 amount: Math.round(amount / 1000) * 1000,
                 description: `${item.desc} (Bulan Lalu)`,
                 date: randomDate(lastMonthYear, lastMonth),
-                categoryId: categories[item.cat],
+                categoryId: categories[item.cat] ?? null,
                 createdById: userId
             }
         });

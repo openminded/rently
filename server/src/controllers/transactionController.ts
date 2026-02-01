@@ -95,34 +95,37 @@ export const transactionController = {
                 const txStatus = type === 'IMMEDIATE' ? 'RENTED' : 'BOOKED';
 
                 // Create Header
+                const transactionData: any = {
+                    type: type || 'BOOKING',
+                    customerId,
+                    userId: req.user?.id ?? null, // Track who created the booking
+                    pickupDate: new Date(pickupDate),
+                    returnPlanDate: new Date(returnPlanDate),
+                    status: txStatus as any, // Cast to any to avoid Enum TS issues with provisional types
+                    totalAmount: totalAmount,
+                    depositAmount: depositVal,
+                    depositStatus: depositVal > 0 ? 'HELD' : null,
+                    paidAmount: paid,
+                    adminFee: parseFloat(adminFee as string || '0'),
+                    taxRate: parseFloat(taxRate as string || '0'),
+                    taxAmount: parseFloat(taxAmount as string || '0'),
+                    paymentStatus: payStatus as any,
+                    items: {
+                        create: transactionItemsData
+                    }
+                };
+                if (payment) {
+                    transactionData.payments = {
+                        create: {
+                            amount: paid,
+                            paymentMethodId: payment.methodId,
+                            note: payment.note,
+                            createdById: req.user?.id ?? null // Track payment receiver
+                        }
+                    };
+                }
                 const transaction = await tx.transaction.create({
-                    data: {
-                        type: type || 'BOOKING',
-                        customerId,
-                        userId: req.user?.id, // Track who created the booking
-                        pickupDate: new Date(pickupDate),
-                        returnPlanDate: new Date(returnPlanDate),
-                        status: txStatus as any, // Cast to any to avoid Enum TS issues with provisional types
-                        totalAmount: totalAmount,
-                        depositAmount: depositVal,
-                        depositStatus: depositVal > 0 ? 'HELD' : null,
-                        paidAmount: paid,
-                        adminFee: parseFloat(adminFee as string || '0'),
-                        taxRate: parseFloat(taxRate as string || '0'),
-                        taxAmount: parseFloat(taxAmount as string || '0'),
-                        paymentStatus: payStatus as any,
-                        items: {
-                            create: transactionItemsData
-                        },
-                        payments: payment ? {
-                            create: {
-                                amount: paid,
-                                paymentMethodId: payment.methodId,
-                                note: payment.note,
-                                createdById: req.user?.id // Track payment receiver
-                            }
-                        } : undefined
-                    },
+                    data: transactionData,
                     include: {
                         items: true,
                         payments: true
@@ -172,7 +175,7 @@ export const transactionController = {
                         amount: parseFloat(payment.amount),
                         paymentMethodId: payment.methodId,
                         note: payment.note || 'Manual Payment',
-                        createdById: req.user?.id // Track who took the payment
+                        createdById: req.user?.id ?? null // Track who took the payment
                     }
                 });
 
@@ -254,7 +257,7 @@ export const transactionController = {
                         paidAmount: currentPaid,
                         paymentStatus: 'PAID',
                         pickupDate: new Date(), // Actual pickup time
-                        pickedUpById: req.user?.id // Track who processed the pickup
+                        pickedUpById: req.user?.id ?? null // Track who processed the pickup
                     }
                 });
 
@@ -284,7 +287,7 @@ export const transactionController = {
             console.log('Request body:', { returnDate, fines, itemsStatus });
 
             const transaction = await prisma.transaction.findUnique({
-                where: { id: parseInt(id) },
+                where: { id: parseInt((id as string) ?? '0') },
                 include: { items: true }
             });
 

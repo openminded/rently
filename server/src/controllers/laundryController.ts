@@ -134,7 +134,7 @@ export const laundryController = {
             const { items } = req.body; // Array of { logId: number, status: 'AVAILABLE' | 'NOT_READY', note?: string }
 
             await prisma.$transaction(async (tx) => {
-                const batchId = parseInt(id);
+                const batchId = parseInt((id as string) || '0');
 
                 // If items provided, update specific logs
                 if (items && Array.isArray(items) && items.length > 0) {

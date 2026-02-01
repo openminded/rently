@@ -29,7 +29,7 @@ const createCrud = (modelName: string, orderBy: any = { id: 'asc' }) => ({
             const { id } = req.params;
             // @ts-ignore
             const item = await prisma[modelName].update({
-                where: { id: parseInt(id) },
+                where: { id: parseInt((id as string) || '0') },
                 data: req.body
             });
             res.json(item);
@@ -41,7 +41,7 @@ const createCrud = (modelName: string, orderBy: any = { id: 'asc' }) => ({
         try {
             const { id } = req.params;
             // @ts-ignore
-            await prisma[modelName].delete({ where: { id: parseInt(id) } });
+            await prisma[modelName].delete({ where: { id: parseInt((id as string) || '0') } });
             res.json({ message: 'Deleted' });
         } catch (error) {
             res.status(500).json({ error: `Failed to delete ${modelName}` });
@@ -77,13 +77,13 @@ const depositVariantsController = {
         try {
             const { id } = req.params;
             const { name, amount, active } = req.body;
+            const data: any = { name, active };
+            if (amount !== undefined) {
+                data.amount = parseFloat(amount);
+            }
             const item = await prisma.depositVariant.update({
-                where: { id: parseInt(id) },
-                data: {
-                    name,
-                    amount: amount !== undefined ? parseFloat(amount) : undefined,
-                    active
-                }
+                where: { id: parseInt((id as string) || '0') },
+                data
             });
             res.json(item);
         } catch (error) {
@@ -94,7 +94,7 @@ const depositVariantsController = {
         try {
             const { id } = req.params;
             await prisma.depositVariant.update({
-                where: { id: parseInt(id) },
+                where: { id: parseInt((id as string) || '0') },
                 data: { active: false }
             });
             res.json({ message: 'Deleted' });

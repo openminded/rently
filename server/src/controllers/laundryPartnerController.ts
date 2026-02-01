@@ -21,7 +21,7 @@ export const getPartner = async (req: Request, res: Response) => {
     try {
         const { id } = req.params;
         const partner = await prisma.laundryPartner.findUnique({
-            where: { id: parseInt(id) },
+            where: { id: parseInt((id as string) || '0') },
             include: {
                 batches: {
                     include: {
@@ -72,7 +72,7 @@ export const updatePartner = async (req: Request, res: Response) => {
         const { id } = req.params;
         const { name, phone, address } = req.body;
         const partner = await prisma.laundryPartner.update({
-            where: { id: parseInt(id) },
+            where: { id: parseInt((id as string) || '0') },
             data: { name, phone, address }
         });
         res.json(partner);
@@ -87,7 +87,7 @@ export const deletePartner = async (req: Request, res: Response) => {
     try {
         const { id } = req.params;
         await prisma.laundryPartner.delete({
-            where: { id: parseInt(id) }
+            where: { id: parseInt((id as string) || '0') }
         });
         res.json({ message: 'Partner deleted successfully' });
     } catch (error) {

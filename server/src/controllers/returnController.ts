@@ -10,7 +10,7 @@ export const returnController = {
             const rentals = await prisma.transaction.findMany({
                 where: {
                     status: {
-                        in: ['BOOKED', 'PICKED_UP', 'RETURNED'] // Include RETURNED for history/audit before completion? Or just active.
+                        in: ['BOOKED', 'RENTED', 'RETURNED'] // Include RETURNED for history/audit before completion? Or just active.
                         // Let's stick to active for the "Returns" workspace, maybe a toggle for history later.
                     }
                 },
@@ -118,7 +118,7 @@ export const returnController = {
                     data: {
                         actualReturnDate: new Date(returnDate),
                         status: 'RETURNED' as any, // Changed from COMPLETED to RETURNED
-                        returnedById: req.user?.id // Track who processed the return
+                        returnedById: req.user?.id ?? null // Track who processed the return
                     }
                 });
 
@@ -165,7 +165,7 @@ export const returnController = {
                             amount: payment.amount,
                             paymentMethodId: payment.methodId,
                             note: payment.note || 'Fine/Late Payment',
-                            createdById: req.user?.id // Track who took the payment
+                            createdById: req.user?.id ?? null // Track who took the payment
                         }
                     });
 
