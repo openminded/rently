@@ -1,4 +1,4 @@
-import { Router, Request, Response } from 'express';
+import { Router, type Request, type Response } from 'express';
 import archiver from 'archiver';
 import unzipper from 'unzipper';
 import fs from 'fs';
@@ -31,7 +31,7 @@ router.get('/download', async (req: Request, res: Response) => {
             zlib: { level: 9 } // Maximum compression
         });
 
-        archive.on('warning', (err) => {
+        archive.on('warning', (err: any) => {
             if (err.code === 'ENOENT') {
                 console.warn('Backup warning:', err);
             } else {
@@ -39,7 +39,7 @@ router.get('/download', async (req: Request, res: Response) => {
             }
         });
 
-        archive.on('error', (err) => {
+        archive.on('error', (err: any) => {
             throw err;
         });
 
@@ -85,7 +85,7 @@ router.post('/restore', upload.single('backupFile'), async (req: Request, res: R
 
                 res.json({ message: 'Assets restored successfully' });
             })
-            .on('error', (err) => {
+            .on('error', (err: any) => {
                 console.error('Unzip Error:', err);
                 // Try cleanup on error
                 if (fs.existsSync(zipPath)) fs.unlinkSync(zipPath);

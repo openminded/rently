@@ -460,6 +460,11 @@ export const translations = {
         "backup.alert.confirmReset": "DANGER: This will DELETE ALL DATA permanently. Are you sure?",
         "backup.alert.typeReset": "Type 'RESET' to confirm deletion:",
         "backup.alert.resetCancelled": "Reset cancelled.",
+        "backup.assets.status.downloading": "Downloading assets packet...",
+        "backup.assets.status.success": "Assets downloaded successfully!",
+        "backup.assets.alert.confirm": "Are you sure? This will overwrite existing assets.",
+        "backup.assets.status.uploading": "Uploading assets...",
+        "backup.assets.status.restoreSuccess": "Assets restored successfully!",
 
         // Broadcast
         "broadcast.title": "Broadcast / Mass Messages",
@@ -961,6 +966,11 @@ export const translations = {
         "backup.alert.confirmReset": "BAHAYA: Ini akan MENGHAPUS SEMUA DATA secara permanen. Anda yakin?",
         "backup.alert.typeReset": "Ketik 'RESET' untuk mengonfirmasi penghapusan:",
         "backup.alert.resetCancelled": "Reset dibatalkan.",
+        "backup.assets.status.downloading": "Mengunduh paket aset...",
+        "backup.assets.status.success": "Aset berhasil diunduh!",
+        "backup.assets.alert.confirm": "Apakah Anda yakin? Ini akan menimpa aset yang ada.",
+        "backup.assets.status.uploading": "Mengunggah aset...",
+        "backup.assets.status.restoreSuccess": "Aset berhasil dipulihkan!",
 
         // Broadcast
         "broadcast.title": "Broadcast / Pesan Massal",
