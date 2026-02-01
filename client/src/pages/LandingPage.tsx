@@ -3,6 +3,7 @@ import { ArrowRight, ShoppingBag, Menu, X, Play, ChevronDown, ArrowUpRight, Sear
 import { useNavigate } from 'react-router-dom';
 
 import { API_BASE_URL, getImageUrl } from '../config/api';
+import { useBrand } from '../hooks/useBrand';
 
 const API_BASE = API_BASE_URL;
 
@@ -20,6 +21,7 @@ export default function LandingPage() {
     const [categories, setCategories] = useState<any[]>([]);
     const [activeCategory, setActiveCategory] = useState<any>('ALL');
     const navigate = useNavigate();
+    const brand = useBrand();
 
     useEffect(() => {
         // Fetch Settings & Items in parallel
@@ -63,8 +65,14 @@ export default function LandingPage() {
             {/* Navbar - Floating & Rounded */}
             <nav className="fixed top-6 left-1/2 -translate-x-1/2 w-[90%] max-w-6xl z-50 bg-white/80 backdrop-blur-md rounded-full shadow-sm border border-white/50 px-6 py-3 flex justify-between items-center transition-all">
                 <div className="text-xl font-black tracking-tight uppercase cursor-pointer flex items-center gap-2" onClick={() => navigate('/')}>
-                    <div className="w-3 h-3 bg-[#4A3B32] rounded-full"></div>
-                    RumahDinar
+                    {brand.logo ? (
+                        <img src={getImageUrl(brand.logo)} alt={brand.name} className="h-8 w-auto object-contain" />
+                    ) : (
+                        <>
+                            <div className="w-3 h-3 bg-[#4A3B32] rounded-full"></div>
+                            {brand.name}
+                        </>
+                    )}
                 </div>
 
                 <div className="hidden md:flex gap-8 text-sm font-bold uppercase tracking-wider text-[#8A7A6F]">
@@ -421,7 +429,7 @@ export default function LandingPage() {
                 <div className="max-w-7xl mx-auto px-8">
                     <div className="grid grid-cols-1 md:grid-cols-4 gap-12 mb-16">
                         <div className="col-span-2">
-                            <h2 className="text-4xl font-black uppercase tracking-tight mb-6 text-white">RumahDinar</h2>
+                            <h2 className="text-4xl font-black uppercase tracking-tight mb-6 text-white">{brand.name}</h2>
                             <p className="max-w-sm text-[#8A7A6F] leading-relaxed">
                                 {appSettings.LANDING_FOOTER_ABOUT || 'Dari busana wisuda hingga gaun pernikahan, kami menyediakan ribuan pilihan untuk menyempurnakan hari istimewa Anda.'}
                             </p>
@@ -455,7 +463,7 @@ export default function LandingPage() {
                     </div>
 
                     <div className="border-t border-[#5D4037] pt-8 flex justify-between items-center text-xs font-bold uppercase tracking-widest text-[#5D4037]">
-                        <p>© 2026 Rumah Dinar Inc.</p>
+                        <p>© 2026 {brand.name} Inc.</p>
                         <button className="flex items-center gap-2 hover:text-white transition-colors">
                             Kembali ke Atas <ArrowDownIcon className="rotate-180" size={14} />
                         </button>
