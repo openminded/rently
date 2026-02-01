@@ -128,6 +128,90 @@ export default function BackupRestore() {
         }
     };
 
+    // Asset Backup & Restore Logic
+    const [assetProgress, setAssetProgress] = useState(0);
+    const [assetStatus, setAssetStatus] = useState('');
+    const [assetFile, setAssetFile] = useState<File | null>(null);
+
+    const handleAssetBackup = async () => {
+        setLoading(true);
+        setAssetStatus(t('backup.assets.status.downloading') || 'Downloading assets packet...');
+        setAssetProgress(10); // Start progress
+
+        try {
+            const response = await fetch(`${API_BASE_URL}/backup/assets/download`, {
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+
+            if (!response.ok) throw new Error('Download failed');
+
+            setAssetProgress(50);
+            const blob = await response.blob();
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `assets_backup_${new Date().toISOString().split('T')[0]}.zip`;
+            document.body.appendChild(a);
+            a.click();
+            window.URL.revokeObjectURL(url);
+            document.body.removeChild(a);
+
+            setAssetProgress(100);
+            setAssetStatus(t('backup.assets.status.success') || 'Assets downloaded successfully');
+        } catch (error) {
+            console.error(error);
+            alert(t('common.error'));
+            setAssetStatus(t('common.error'));
+        } finally {
+            setTimeout(() => { setLoading(false); setAssetProgress(0); setAssetStatus(''); }, 3000);
+        }
+    };
+
+    const handleAssetRestore = () => {
+        if (!assetFile) return alert(t('backup.alert.selectFile'));
+        if (!confirm(t('backup.assets.alert.confirm') || 'Are you sure? This will overwrite existing assets.')) return;
+
+        setLoading(true);
+        setAssetStatus(t('backup.assets.status.uploading') || 'Uploading assets...');
+        setAssetProgress(0);
+
+        const formData = new FormData();
+        formData.append('backupFile', assetFile);
+
+        const xhr = new XMLHttpRequest();
+        xhr.open('POST', `${API_BASE_URL}/backup/assets/restore`, true);
+        xhr.setRequestHeader('Authorization', `Bearer ${token}`);
+
+        // Track upload progress
+        xhr.upload.onprogress = (event) => {
+            if (event.lengthComputable) {
+                const percentComplete = Math.round((event.loaded / event.total) * 90); // 90% for upload
+                setAssetProgress(percentComplete);
+                setAssetStatus(`Uploading... ${percentComplete}%`);
+            }
+        };
+
+        xhr.onload = () => {
+            if (xhr.status === 200) {
+                setAssetProgress(100);
+                setAssetStatus(t('backup.assets.status.restoreSuccess') || 'Assets restored successfully!');
+                setTimeout(() => window.location.reload(), 2000);
+            } else {
+                setLoading(false);
+                alert('Restore failed');
+                setAssetStatus('Failed');
+            }
+        };
+
+        xhr.onerror = () => {
+            setLoading(false);
+            alert('Network error');
+            setAssetStatus('Error');
+        };
+
+        xhr.send(formData);
+    };
+
     return (
         <div className="max-w-4xl mx-auto space-y-8 p-4">
             <div className="mb-8">
@@ -136,57 +220,102 @@ export default function BackupRestore() {
             </div>
 
             {loading && (
-                <div className="bg-blue-50 border border-blue-100 p-6 rounded-xl text-center space-y-4 animate-in fade-in slide-in-from-top-4">
+                <div className="bg-blue-50 border border-blue-100 p-6 rounded-xl text-center space-y-4 animate-in fade-in slide-in-from-top-4 fixed top-4 right-4 z-50 shadow-lg w-80">
                     <RefreshCw className="mx-auto text-blue-600 animate-spin" size={32} />
-                    <h3 className="font-semibold text-blue-900">{status}</h3>
+                    <h3 className="font-semibold text-blue-900">{status || assetStatus}</h3>
                     <div className="w-full bg-blue-200 rounded-full h-2.5">
-                        <div className="bg-blue-600 h-2.5 rounded-full transition-all duration-300" style={{ width: `${progress}%` }}></div>
+                        <div className="bg-blue-600 h-2.5 rounded-full transition-all duration-300" style={{ width: `${progress || assetProgress}%` }}></div>
                     </div>
-                    <p className="text-xs text-blue-500">{progress}%</p>
+                    <p className="text-xs text-blue-500">{progress || assetProgress}%</p>
                 </div>
             )}
 
-            <div className="grid md:grid-cols-2 gap-6">
-                {/* Backup Section */}
-                <div className="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm hover:shadow-md transition-shadow">
-                    <div className="w-12 h-12 bg-green-100 rounded-xl flex items-center justify-center mb-4">
-                        <Download className="text-green-600" size={24} />
+            {/* Database Section */}
+            <div className="space-y-4">
+                <h2 className="text-xl font-bold text-gray-800 border-b pb-2">Database Backup</h2>
+                <div className="grid md:grid-cols-2 gap-6">
+                    <div className="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm hover:shadow-md transition-shadow">
+                        <div className="w-12 h-12 bg-green-100 rounded-xl flex items-center justify-center mb-4">
+                            <Download className="text-green-600" size={24} />
+                        </div>
+                        <h3 className="text-lg font-bold text-gray-900 mb-2">{t('backup.card.backup.title')}</h3>
+                        <p className="text-sm text-gray-500 mb-6">{t('backup.card.backup.desc')}</p>
+                        <button
+                            onClick={handleBackup}
+                            disabled={loading}
+                            className="w-full py-3 bg-gray-900 text-white rounded-xl font-medium hover:bg-gray-800 transition-colors flex items-center justify-center gap-2 disabled:bg-gray-400"
+                        >
+                            <Download size={18} /> {t('backup.card.backup.action')}
+                        </button>
                     </div>
-                    <h3 className="text-lg font-bold text-gray-900 mb-2">{t('backup.card.backup.title')}</h3>
-                    <p className="text-sm text-gray-500 mb-6">{t('backup.card.backup.desc')}</p>
-                    <button
-                        onClick={handleBackup}
-                        disabled={loading}
-                        className="w-full py-3 bg-gray-900 text-white rounded-xl font-medium hover:bg-gray-800 transition-colors flex items-center justify-center gap-2 disabled:bg-gray-400"
-                    >
-                        <Download size={18} /> {t('backup.card.backup.action')}
-                    </button>
-                </div>
 
-                {/* Restore Section */}
-                <div className="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm hover:shadow-md transition-shadow">
-                    <div className="w-12 h-12 bg-orange-100 rounded-xl flex items-center justify-center mb-4">
-                        <Upload className="text-orange-600" size={24} />
-                    </div>
-                    <h3 className="text-lg font-bold text-gray-900 mb-2">{t('backup.card.restore.title')}</h3>
-                    <p className="text-sm text-gray-500 mb-6">{t('backup.card.restore.desc')}</p>
-
-                    <div className="space-y-4">
-                        <div className="relative">
+                    <div className="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm hover:shadow-md transition-shadow">
+                        <div className="w-12 h-12 bg-orange-100 rounded-xl flex items-center justify-center mb-4">
+                            <Upload className="text-orange-600" size={24} />
+                        </div>
+                        <h3 className="text-lg font-bold text-gray-900 mb-2">{t('backup.card.restore.title')}</h3>
+                        <p className="text-sm text-gray-500 mb-6">{t('backup.card.restore.desc')}</p>
+                        <div className="space-y-4">
                             <input
                                 type="file"
                                 accept=".json"
                                 onChange={(e) => setRestoreFile(e.target.files ? e.target.files[0] : null)}
                                 className="w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-orange-50 file:text-orange-700 hover:file:bg-orange-100"
                             />
+                            <button
+                                onClick={handleRestore}
+                                disabled={loading || !restoreFile}
+                                className="w-full py-3 bg-orange-600 text-white rounded-xl font-medium hover:bg-orange-700 transition-colors flex items-center justify-center gap-2 disabled:bg-gray-300"
+                            >
+                                <RefreshCw size={18} /> {t('backup.card.restore.action')}
+                            </button>
                         </div>
+                    </div>
+                </div>
+            </div>
+
+            {/* Assets Section */}
+            <div className="space-y-4 pt-6">
+                <h2 className="text-xl font-bold text-gray-800 border-b pb-2">Assets (Images) Backup</h2>
+                <div className="grid md:grid-cols-2 gap-6">
+                    {/* Asset Download */}
+                    <div className="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm hover:shadow-md transition-shadow">
+                        <div className="w-12 h-12 bg-blue-100 rounded-xl flex items-center justify-center mb-4">
+                            <Download className="text-blue-600" size={24} />
+                        </div>
+                        <h3 className="text-lg font-bold text-gray-900 mb-2">Download Assets</h3>
+                        <p className="text-sm text-gray-500 mb-6">Download all uploaded images as a ZIP file.</p>
                         <button
-                            onClick={handleRestore}
-                            disabled={loading || !restoreFile}
-                            className="w-full py-3 bg-orange-600 text-white rounded-xl font-medium hover:bg-orange-700 transition-colors flex items-center justify-center gap-2 disabled:bg-gray-300"
+                            onClick={handleAssetBackup}
+                            disabled={loading}
+                            className="w-full py-3 bg-blue-600 text-white rounded-xl font-medium hover:bg-blue-700 transition-colors flex items-center justify-center gap-2 disabled:bg-gray-400"
                         >
-                            <RefreshCw size={18} /> {t('backup.card.restore.action')}
+                            <Download size={18} /> Download ZIP
                         </button>
+                    </div>
+
+                    {/* Asset Restore */}
+                    <div className="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm hover:shadow-md transition-shadow">
+                        <div className="w-12 h-12 bg-purple-100 rounded-xl flex items-center justify-center mb-4">
+                            <Upload className="text-purple-600" size={24} />
+                        </div>
+                        <h3 className="text-lg font-bold text-gray-900 mb-2">Restore Assets</h3>
+                        <p className="text-sm text-gray-500 mb-6">Upload ZIP file to restore images (Overwrites existing).</p>
+                        <div className="space-y-4">
+                            <input
+                                type="file"
+                                accept=".zip"
+                                onChange={(e) => setAssetFile(e.target.files ? e.target.files[0] : null)}
+                                className="w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-purple-50 file:text-purple-700 hover:file:bg-purple-100"
+                            />
+                            <button
+                                onClick={handleAssetRestore}
+                                disabled={loading || !assetFile}
+                                className="w-full py-3 bg-purple-600 text-white rounded-xl font-medium hover:bg-purple-700 transition-colors flex items-center justify-center gap-2 disabled:bg-gray-300"
+                            >
+                                <RefreshCw size={18} /> Restore Assets
+                            </button>
+                        </div>
                     </div>
                 </div>
             </div>

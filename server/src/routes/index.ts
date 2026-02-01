@@ -5,6 +5,7 @@ import transactionRoutes from './transactionRoutes.js';
 import laundryRoutes from './laundryRoutes.js';
 import laundryPartnerRoutes from './laundryPartnerRoutes.js';
 import backupRoutes from './backupRoutes.js';
+import assetBackupRoutes from './assetBackupRoutes.js';
 import dashboardRoutes from './dashboardRoutes.js';
 import returnRoutes from './returnRoutes.js';
 import settingsRoutes from './settingsRoutes.js';
@@ -106,6 +107,7 @@ router.use('/laundry', authenticateToken, laundryRoutes);
 router.use('/laundry-partners', authenticateToken, laundryPartnerRoutes);
 router.use('/returns', returnRoutes);
 router.use('/backup', backupRoutes);
+router.use('/backup/assets', assetBackupRoutes);
 router.use('/settings', authenticateToken, settingsRoutes);
 router.use('/finance', authenticateToken, financeRouter);
 
