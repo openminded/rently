@@ -12,10 +12,8 @@ const router = Router();
 // Configure storage
 const storage = multer.diskStorage({
     destination: function (req, file, cb) {
-        // Resolve path to client/public/uploads
-        // Assumes server is running in /server
-        // We need to go up to root, then client/public/uploads
-        const uploadPath = path.resolve(__dirname, '../../../client/public/uploads');
+        // Resolve path to server/uploads (where index.js runs)
+        const uploadPath = path.resolve(process.cwd(), 'uploads');
 
         // Ensure directory exists
         if (!fs.existsSync(uploadPath)) {

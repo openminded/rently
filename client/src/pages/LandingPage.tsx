@@ -142,7 +142,7 @@ export default function LandingPage() {
                         <div className="relative z-10 rounded-[3rem] overflow-hidden shadow-2xl bg-white p-2">
                             <div className="rounded-[2.5rem] overflow-hidden aspect-[4/5] bg-gray-100">
                                 <img
-                                    src={appSettings.LANDING_HERO_IMAGE || '/hero_indo.png'}
+                                    src={appSettings.LANDING_HERO_IMAGE ? getImageUrl(appSettings.LANDING_HERO_IMAGE) : '/hero_indo.png'}
                                     alt="Hero Model"
                                     className="w-full h-full object-cover hover:scale-105 transition-transform duration-700"
                                 />
@@ -192,7 +192,7 @@ export default function LandingPage() {
                         <div className="relative group">
                             <div className="rounded-[2rem] overflow-hidden aspect-square shadow-lg bg-gray-100">
                                 <img
-                                    src={appSettings.LANDING_FEATURE_IMG_1 || 'https://images.unsplash.com/photo-1616847231454-9e7ec2a53160?q=80&w=800&auto=format&fit=crop'}
+                                    src={appSettings.LANDING_FEATURE_IMG_1 ? getImageUrl(appSettings.LANDING_FEATURE_IMG_1) : 'https://images.unsplash.com/photo-1616847231454-9e7ec2a53160?q=80&w=800&auto=format&fit=crop'}
                                     alt="Feature 1"
                                     className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700"
                                 />
@@ -217,7 +217,7 @@ export default function LandingPage() {
 
                             <div className="mt-8 rounded-[2rem] overflow-hidden aspect-video shadow-lg relative group bg-gray-100">
                                 <img
-                                    src={appSettings.LANDING_FEATURE_IMG_2 || 'https://images.unsplash.com/photo-1621287959048-c84288b323bd?q=80&w=800&auto=format&fit=crop'}
+                                    src={appSettings.LANDING_FEATURE_IMG_2 ? getImageUrl(appSettings.LANDING_FEATURE_IMG_2) : 'https://images.unsplash.com/photo-1621287959048-c84288b323bd?q=80&w=800&auto=format&fit=crop'}
                                     alt="Feature 2"
                                     className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700"
                                 />
@@ -319,13 +319,13 @@ export default function LandingPage() {
                             <div className="grid grid-cols-2 gap-4">
                                 <div className="bg-white p-2 rounded-[2rem] shadow-lg rotate-[-3deg]">
                                     <img
-                                        src={appSettings.LANDING_PROMO_IMG_1 || 'https://images.unsplash.com/photo-1542272617-08f08630329e?auto=format&fit=crop&q=80&w=400'}
+                                        src={appSettings.LANDING_PROMO_IMG_1 ? getImageUrl(appSettings.LANDING_PROMO_IMG_1) : 'https://images.unsplash.com/photo-1542272617-08f08630329e?auto=format&fit=crop&q=80&w=400'}
                                         className="w-full aspect-[3/4] object-cover rounded-[1.5rem]" alt="Promo 1"
                                     />
                                 </div>
                                 <div className="bg-white p-2 rounded-[2rem] shadow-lg rotate-[3deg] mt-12">
                                     <img
-                                        src={appSettings.LANDING_PROMO_IMG_2 || 'https://images.unsplash.com/photo-1496747611176-843222e1e57c?auto=format&fit=crop&q=80&w=400'}
+                                        src={appSettings.LANDING_PROMO_IMG_2 ? getImageUrl(appSettings.LANDING_PROMO_IMG_2) : 'https://images.unsplash.com/photo-1496747611176-843222e1e57c?auto=format&fit=crop&q=80&w=400'}
                                         className="w-full aspect-[3/4] object-cover rounded-[1.5rem]" alt="Promo 2"
                                     />
                                 </div>
@@ -366,7 +366,7 @@ export default function LandingPage() {
                 <div className="max-w-7xl mx-auto grid grid-cols-1 md:grid-cols-2 gap-12 items-center">
                     <div className="order-2 md:order-1">
                         <img
-                            src={appSettings.LANDING_ABOUT_IMAGE || 'https://images.unsplash.com/photo-1558769132-cb1aea458c5e?q=80&w=1000&auto=format&fit=crop'}
+                            src={appSettings.LANDING_ABOUT_IMAGE ? getImageUrl(appSettings.LANDING_ABOUT_IMAGE) : 'https://images.unsplash.com/photo-1558769132-cb1aea458c5e?q=80&w=1000&auto=format&fit=crop'}
                             alt="About Us"
                             className="rounded-[3rem] shadow-xl w-full object-cover aspect-video hover:grayscale transition-all duration-500"
                         />

@@ -3,7 +3,7 @@ import { useLanguage } from '../../context/LanguageContext';
 import { useAuth } from '../../context/AuthContext';
 import { Globe, Settings, ReceiptText, LayoutDashboard, Megaphone, Upload, Image as ImageIcon, X } from 'lucide-react';
 
-import { API_BASE_URL } from '../../config/api';
+import { API_BASE_URL, getImageUrl } from '../../config/api';
 
 const API_URL = API_BASE_URL;
 
@@ -461,7 +461,7 @@ function ImageUpload({ url, onUpload, label }: { url: string, onUpload: (url: st
                     onClick={() => inputRef.current?.click()}
                 >
                     {url ? (
-                        <img src={url} alt="Preview" className="w-full h-full object-cover" />
+                        <img src={getImageUrl(url)} alt="Preview" className="w-full h-full object-cover" />
                     ) : (
                         <ImageIcon className="text-gray-400" />
                     )}
