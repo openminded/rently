@@ -4,7 +4,9 @@ import { DataTable, type Column } from '../../components/common/DataTable';
 import { useAuth } from '../../context/AuthContext';
 import { useLanguage } from '../../context/LanguageContext';
 
-const API_BASE = 'http://localhost:3000/api/masters';
+import { API_BASE_URL } from '../../config/api';
+
+const API_BASE = `${API_BASE_URL}/masters`;
 
 interface Field {
     name: string;

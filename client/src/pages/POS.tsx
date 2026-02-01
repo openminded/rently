@@ -4,7 +4,9 @@ import { Search, Plus, ShoppingCart, User, Calendar, Trash2 } from 'lucide-react
 import { useAuth } from '../context/AuthContext';
 import { useLanguage } from '../context/LanguageContext';
 
-const API_URL = 'http://localhost:3000/api';
+import { API_BASE_URL, getImageUrl } from '../config/api';
+
+const API_URL = API_BASE_URL;
 
 export default function POS() {
     const { token } = useAuth();
@@ -391,7 +393,7 @@ export default function POS() {
                             <div className="h-32 bg-gray-100 rounded-lg mb-3 flex items-center justify-center text-gray-400 overflow-hidden">
                                 {item.images && item.images.length > 0 ? (
                                     <img
-                                        src={`http://localhost:3000${item.images[0].url}`}
+                                        src={getImageUrl(item.images[0].url)}
                                         alt={item.name}
                                         loading="lazy"
                                         className="w-full h-full object-cover"
@@ -497,7 +499,7 @@ export default function POS() {
                                     <div className="w-12 h-12 bg-gray-100 rounded-lg flex-shrink-0 overflow-hidden">
                                         {item.imageUrl ? (
                                             <img
-                                                src={`http://localhost:3000${item.imageUrl}`}
+                                                src={getImageUrl(item.imageUrl)}
                                                 alt={item.name}
                                                 className="w-full h-full object-cover"
                                             />

@@ -4,11 +4,11 @@ module.exports = {
         script: './dist/index.js',
         env_production: {
             NODE_ENV: 'production',
-            PORT: 3000
+            PORT: 3005
         },
         env_development: {
             NODE_ENV: 'development',
-            PORT: 3000
+            PORT: 3005
         },
         // Error handling
         error_file: './logs/err.log',

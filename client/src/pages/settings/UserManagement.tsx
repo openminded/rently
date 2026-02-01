@@ -4,7 +4,9 @@ import { DataTable, type Column } from '../../components/common/DataTable';
 import { useAuth } from '../../context/AuthContext';
 import { useLanguage } from '../../context/LanguageContext';
 
-const API_URL = 'http://localhost:3000/api/users';
+import { API_BASE_URL } from '../../config/api';
+
+const API_URL = `${API_BASE_URL}/users`;
 
 export default function UserManagement() {
     const { token } = useAuth();

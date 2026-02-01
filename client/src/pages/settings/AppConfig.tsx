@@ -3,7 +3,9 @@ import { useLanguage } from '../../context/LanguageContext';
 import { useAuth } from '../../context/AuthContext';
 import { Globe, Settings, ReceiptText, LayoutDashboard, Megaphone, Upload, Image as ImageIcon, X } from 'lucide-react';
 
-const API_URL = 'http://localhost:3000/api';
+import { API_BASE_URL } from '../../config/api';
+
+const API_URL = API_BASE_URL;
 
 export default function AppConfig() {
     const { language, setLanguage, t } = useLanguage();
@@ -210,7 +212,7 @@ export default function AppConfig() {
                                     onClick={async () => {
                                         if (confirm('Isi semua kolom dengan data default sistem? Data yang sudah ada mungkin tertimpa.')) {
                                             try {
-                                                await fetch('http://localhost:3000/api/seed');
+                                                await fetch(`${API_URL}/seed`);
                                                 window.location.reload();
                                             } catch (e) { alert('Gagal mengisi data default'); }
                                         }

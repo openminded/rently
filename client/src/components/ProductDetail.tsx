@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { getImageUrl } from '../config/api';
 import { useLanguage } from '../context/LanguageContext';
 import { X, Tag, Box, AlertCircle, Trash2 } from 'lucide-react';
 
@@ -26,7 +27,7 @@ export default function ProductDetail({ item, onClose, onEdit, hideEditButton = 
                     <div className="flex-1 flex items-center justify-center p-8">
                         {images.length > 0 ? (
                             <img
-                                src={`http://localhost:3000${images[activeImage].url}`}
+                                src={getImageUrl(images[activeImage].url)}
                                 alt={item.name}
                                 className="max-w-full max-h-full object-contain drop-shadow-lg"
                             />
@@ -46,7 +47,7 @@ export default function ProductDetail({ item, onClose, onEdit, hideEditButton = 
                                     onClick={() => setActiveImage(idx)}
                                     className={`w-12 h-12 md:w-16 md:h-16 rounded-lg overflow-hidden border-2 transition-all ${activeImage === idx ? 'border-gray-900 scale-105' : 'border-transparent opacity-70 hover:opacity-100'}`}
                                 >
-                                    <img src={`http://localhost:3000${img.url}`} className="w-full h-full object-cover" />
+                                    <img src={getImageUrl(img.url)} className="w-full h-full object-cover" />
                                 </button>
                             ))}
                         </div>

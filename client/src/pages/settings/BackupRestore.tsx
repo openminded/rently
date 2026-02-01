@@ -3,7 +3,9 @@ import { Download, Upload, RefreshCw, Trash2, AlertTriangle } from 'lucide-react
 import { useAuth } from '../../context/AuthContext';
 import { useLanguage } from '../../context/LanguageContext';
 
-const API_URL = 'http://localhost:3000/api/backup';
+import { API_BASE_URL } from '../../config/api';
+
+const API_URL = `${API_BASE_URL}/backup`;
 
 export default function BackupRestore() {
     const { token } = useAuth();

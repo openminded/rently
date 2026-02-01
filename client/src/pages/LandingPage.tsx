@@ -2,7 +2,9 @@ import { useState, useEffect } from 'react';
 import { ArrowRight, ShoppingBag, Menu, X, Play, ChevronDown, ArrowUpRight, Search, MessageCircle } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
-const API_BASE = 'http://localhost:3000/api';
+import { API_BASE_URL, getImageUrl } from '../config/api';
+
+const API_BASE = API_BASE_URL;
 
 // Palet Warna:
 // Background: #FFF8F0 (Cream)
@@ -264,7 +266,7 @@ export default function LandingPage() {
                             <div key={item.id} className="bg-white p-3 rounded-[2rem] shadow-sm hover:shadow-xl transition-shadow group">
                                 <div className="rounded-[1.5rem] overflow-hidden aspect-[3/4] mb-4 bg-gray-100 relative">
                                     <img
-                                        src={item.images?.[0]?.url ? `http://localhost:3000${item.images[0].url}` : 'https://via.placeholder.com/400x600'}
+                                        src={item.images?.[0]?.url ? getImageUrl(item.images[0].url) : 'https://via.placeholder.com/400x600'}
                                         alt={item.name}
                                         className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
                                     />

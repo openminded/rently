@@ -3,7 +3,9 @@ import { Plus, Box, X, Save, Eye, Edit2 } from 'lucide-react';
 import { DataTable, type Column } from '../components/common/DataTable';
 import ProductDetail from '../components/ProductDetail';
 
-const API_URL = 'http://localhost:3000/api';
+import { API_BASE_URL, getImageUrl } from '../config/api';
+
+const API_URL = API_BASE_URL;
 
 import { useAuth } from '../context/AuthContext';
 import { useLanguage } from '../context/LanguageContext';
@@ -377,7 +379,7 @@ export default function Inventory() {
             cell: (item) => (
                 <div className="w-12 h-12 bg-gray-50 rounded-lg overflow-hidden border border-gray-100 flex items-center justify-center">
                     {item.images && item.images.length > 0 ? (
-                        <img src={`http://localhost:3000${item.images[0].url}`} alt={item.name} className="w-full h-full object-cover" />
+                        <img src={getImageUrl(item.images[0].url)} alt={item.name} className="w-full h-full object-cover" />
                     ) : (
                         <Box size={16} className="text-gray-400" />
                     )}
@@ -564,7 +566,7 @@ export default function Inventory() {
                                     {/* Existing Images */}
                                     {existingImages.map((img: any) => (
                                         <div key={img.id} className="relative w-16 h-16 rounded border overflow-hidden">
-                                            <img src={`http://localhost:3000${img.url}`} alt="existing" className="w-full h-full object-cover" />
+                                            <img src={getImageUrl(img.url)} alt="existing" className="w-full h-full object-cover" />
                                             <button
                                                 type="button"
                                                 onClick={() => removeExistingImage(img.id)}

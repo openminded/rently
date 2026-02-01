@@ -4,7 +4,9 @@ import { useLanguage } from '../context/LanguageContext';
 import { Search, Box } from 'lucide-react';
 import ProductDetail from '../components/ProductDetail';
 
-const API_URL = 'http://localhost:3000/api';
+import { API_BASE_URL, getImageUrl } from '../config/api';
+
+const API_URL = API_BASE_URL;
 
 export default function Showcase() {
     const { token } = useAuth();
@@ -188,7 +190,7 @@ export default function Showcase() {
                                 <div className="aspect-[4/3] bg-gray-100 relative overflow-hidden">
                                     {item.images && item.images.length > 0 ? (
                                         <img
-                                            src={`http://localhost:3000${item.images[0].url}`}
+                                            src={getImageUrl(item.images[0].url)}
                                             alt={item.name}
                                             className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
                                         />

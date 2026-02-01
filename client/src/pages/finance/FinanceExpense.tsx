@@ -4,7 +4,9 @@ import { useAuth } from '../../context/AuthContext';
 import { useLanguage } from '../../context/LanguageContext';
 import { Plus, Trash2 } from 'lucide-react';
 
-const API_Base = 'http://localhost:3000/api/finance';
+import { API_BASE_URL } from '../../config/api';
+
+const API_Base = `${API_BASE_URL}/finance`;
 
 const formatCurrency = (val: number) => new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(val);
 

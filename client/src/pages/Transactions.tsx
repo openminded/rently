@@ -6,7 +6,9 @@ import { DataTable, type Column } from '../components/common/DataTable';
 import { useAuth } from '../context/AuthContext';
 import { useLanguage } from '../context/LanguageContext';
 
-const API_URL = 'http://localhost:3000/api';
+import { API_BASE_URL } from '../config/api';
+
+const API_URL = API_BASE_URL;
 
 interface TransactionsProps {
     type: 'booking' | 'waiting-pickup' | 'rent' | 'need-return' | 'laundry' | 'completed';

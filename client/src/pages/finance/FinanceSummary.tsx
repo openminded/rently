@@ -8,7 +8,9 @@ import {
     PieChart, Pie, Legend
 } from 'recharts';
 
-const API_Base = 'http://localhost:3000/api/finance';
+import { API_BASE_URL } from '../../config/api';
+
+const API_Base = `${API_BASE_URL}/finance`;
 
 const formatCurrency = (val: number) => {
     return new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(val);

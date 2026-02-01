@@ -1,6 +1,7 @@
 import React from 'react';
 import MasterGenericPage from './MasterGenericPage';
 import { useLanguage } from '../../context/LanguageContext';
+import { getImageUrl } from '../../config/api';
 
 export default function Customers() {
     const { t } = useLanguage();
@@ -18,7 +19,7 @@ export default function Customers() {
                     key: 'identityCardImage',
                     label: 'KTP File',
                     render: (i: any) => i.identityCardImage
-                        ? <a href={`http://localhost:3000${i.identityCardImage}`} target="_blank" className="text-blue-600 hover:underline text-xs">{t('common.actions')}</a>
+                        ? <a href={getImageUrl(i.identityCardImage)} target="_blank" className="text-blue-600 hover:underline text-xs">{t('common.actions')}</a>
                         : <span className="text-gray-400 text-xs">-</span>
                 }
             ]}
