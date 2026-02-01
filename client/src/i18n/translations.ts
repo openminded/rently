@@ -103,6 +103,8 @@ export const translations = {
         "finance.expense": "Expense",
         "finance.profit": "Profit",
         "finance.categories": "Expense Categories",
+        "finance.categoriesTitle": "Category List",
+        "finance.addCategoryTitle": "Add New Category",
         "finance.totalIncome": "Total Income",
         "finance.totalExpense": "Total Expense",
         "finance.totalProfit": "Total Profit",
@@ -458,6 +460,42 @@ export const translations = {
         "backup.alert.confirmReset": "DANGER: This will DELETE ALL DATA permanently. Are you sure?",
         "backup.alert.typeReset": "Type 'RESET' to confirm deletion:",
         "backup.alert.resetCancelled": "Reset cancelled.",
+
+        // Broadcast
+        "broadcast.title": "Broadcast / Mass Messages",
+        "broadcast.tab.connection": "Connection",
+        "broadcast.tab.templates": "Templates",
+        "broadcast.tab.campaigns": "History",
+        "broadcast.status": "Connection Status",
+        "broadcast.linked": "Connected",
+        "broadcast.scanQr": "Scan QR Code",
+
+        // Missing Finance Keys
+        "finance.table.date": "Date",
+        "finance.table.description": "Description",
+        "finance.table.category": "Category",
+        "finance.table.type": "Type",
+        "finance.table.by": "By",
+        "finance.table.amount": "Amount",
+        "finance.newExpenseTitle": "New Expense",
+        "finance.expensePlaceholder": "Expense Description",
+        "finance.table.transactionId": "Transaction ID",
+        "finance.table.customer": "Customer",
+        "finance.table.totalBill": "Total Bill",
+        "finance.table.paid": "Paid",
+        "finance.recordExpense": "Record Expense",
+
+        // Missing POS Keys
+        "pos.alert.selectCustomer": "Please select a customer first.",
+        "pos.alert.cartEmpty": "Cart is empty.",
+
+        // Missing Settings Keys
+        "settings.tab.general": "General",
+        "settings.tab.landing": "Landing Page",
+        "settings.tax.title": "Tax Settings",
+        "settings.tax.desc": "Configure tax rates and application.",
+        "settings.landing.toggleTitle": "Enable Landing Page",
+        "settings.landing.toggleDesc": "Toggle the public landing page visibility.",
     },
     id: {
         // ... Menu (Existing) ...
@@ -841,6 +879,7 @@ export const translations = {
         "settings.form.addressPlaceholder": "Alamat Lengkap...",
         "settings.form.logoGuidelines.size": "Ukuran yang Disarankan: 512x512px (Kotak) atau 200x50px (Persegi Panjang)",
         "settings.form.logoGuidelines.format": "Format: PNG (Disarankan latar belakang transparan) atau JPG",
+        "settings.form.logoGuidelines.maxSize": "Ukuran Maksimal File: 2MB",
         "settings.form.logoGuidelines.contrast": "Pastikan kontras tinggi agar terlihat jelas di latar belakang gelap/terang.",
         "settings.form.tagline": "Slogan",
         "settings.form.saving": "Menyimpan...",
@@ -884,9 +923,7 @@ export const translations = {
         "finance.table.expenseByCategory": "Detail Pengeluaran per Kategori",
         "finance.uncategorized": "Tanpa Kategori",
 
-        "settings.form.logoGuidelines.contrast": "Pastikan kontras tinggi untuk visibilitas pada latar belakang gelap/terang.",
-        "settings.form.tagline": "Slogan",
-        "settings.form.saving": "Menyimpan...",
+
 
         // User Management Page
         "users.title": "Manajemen Pengguna",
@@ -924,6 +961,44 @@ export const translations = {
         "backup.alert.confirmReset": "BAHAYA: Ini akan MENGHAPUS SEMUA DATA secara permanen. Anda yakin?",
         "backup.alert.typeReset": "Ketik 'RESET' untuk mengonfirmasi penghapusan:",
         "backup.alert.resetCancelled": "Reset dibatalkan.",
+
+        // Broadcast
+        "broadcast.title": "Broadcast / Pesan Massal",
+        "broadcast.tab.connection": "Koneksi",
+        "broadcast.tab.templates": "Template",
+        "broadcast.tab.campaigns": "Riwayat",
+        "broadcast.status": "Status Koneksi",
+        "broadcast.linked": "Terhubung",
+        "broadcast.scanQr": "Scan QR Code",
+
+        "finance.categoriesTitle": "Daftar Kategori",
+        "finance.addCategoryTitle": "Tambah Kategori",
+
+        // Missing Finance Keys (ID)
+        "finance.table.date": "Tanggal",
+        "finance.table.description": "Deskripsi",
+        "finance.table.category": "Kategori",
+        "finance.table.type": "Tipe",
+        "finance.table.by": "Oleh",
+        "finance.table.amount": "Jumlah",
+        "finance.newExpenseTitle": "Pengeluaran Baru",
+        "finance.expensePlaceholder": "Deskripsi Pengeluaran",
+        "finance.table.transactionId": "ID Transaksi",
+        "finance.table.customer": "Pelanggan",
+        "finance.table.totalBill": "Total Tagihan",
+        "finance.table.paid": "Dibayar",
+
+        "finance.recordExpense": "Catat Pengeluaran",
+
+        // Missing POS Keys (ID)
+
+        // Missing Settings Keys (ID)
+        "settings.tab.general": "Umum",
+        "settings.tab.landing": "Halaman Utama",
+        "settings.tax.title": "Pengaturan Pajak",
+        "settings.tax.desc": "Konfigurasi tarif dan penerapan pajak.",
+        "settings.landing.toggleTitle": "Aktifkan Landing Page",
+        "settings.landing.toggleDesc": "Tampilkan/Sembunyikan halaman depan publik.",
     }
 };
 

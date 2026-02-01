@@ -142,7 +142,7 @@ export default function FinanceSummary() {
                                 <XAxis type="number" hide />
                                 <YAxis dataKey="name" type="category" width={100} tick={{ fontSize: 12, fontWeight: 600, fill: '#6b7280' }} axisLine={false} tickLine={false} />
                                 <Tooltip
-                                    formatter={(val: number) => formatCurrency(val)}
+                                    formatter={(val: any) => formatCurrency(val)}
                                     cursor={{ fill: 'transparent' }}
                                     contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
                                 />
@@ -180,7 +180,7 @@ export default function FinanceSummary() {
                                         ))}
                                     </Pie>
                                     <Tooltip
-                                        formatter={(val: number) => formatCurrency(val)}
+                                        formatter={(val: any) => formatCurrency(val)}
                                         contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
                                     />
                                     <Legend

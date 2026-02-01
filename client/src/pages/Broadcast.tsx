@@ -226,8 +226,9 @@ export default function Broadcast() {
     // Auto-load from URL query or State
     useEffect(() => {
         // 1. Check State (from Transactions Modal)
-        if (location.state && location.state.targets) {
-            const { targets, content, templateId, type } = location.state;
+        const locState = (location as any).state;
+        if (locState && locState.targets) {
+            const { targets, content, templateId, type } = locState;
             const targetString = targets.map((t: any) => `${t.phone},${t.name}|${t.items || ''}`).join('\n');
             setBroadcastForm(prev => ({
                 ...prev,
@@ -254,7 +255,7 @@ export default function Broadcast() {
             setShowBroadcastModal(true);
             navigate('/app/broadcast', { replace: true });
         }
-    }, [location.search, location.state]);
+    }, [location.search, (location as any).state]);
 
     return (
         <div className="p-6 max-w-6xl mx-auto space-y-6">
