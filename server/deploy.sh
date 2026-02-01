@@ -7,6 +7,7 @@ echo "🚀 Starting Deployment..."
 
 # 1. Pull latest changes
 echo "📥 Pulling from Git..."
+git config --global --add safe.directory /www/wwwroot/werently.telaju.com
 git fetch origin main
 git reset --hard origin/main
 
