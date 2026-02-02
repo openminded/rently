@@ -213,7 +213,7 @@ export default function BackupRestore() {
     };
 
     return (
-        <div className="max-w-4xl mx-auto space-y-8 p-4">
+        <div className="max-w-full mx-auto space-y-8 p-4">
             <div className="mb-8">
                 <h1 className="text-2xl font-bold text-gray-900">{t('backup.title')}</h1>
                 <p className="text-gray-500">{t('backup.subtitle')}</p>

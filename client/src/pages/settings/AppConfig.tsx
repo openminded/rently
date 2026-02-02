@@ -68,7 +68,7 @@ export default function AppConfig() {
     if (loading) return <div className="p-6 text-center text-gray-500">{t('common.loading')}</div>;
 
     return (
-        <div className="p-6 max-w-4xl mx-auto">
+        <div className="p-6 max-w-full mx-auto">
             <h1 className="text-2xl font-bold mb-6 flex items-center gap-2 text-gray-900">
                 <Settings className="text-blue-600" /> {t('settings.appConfig.title')}
             </h1>
@@ -120,27 +120,94 @@ export default function AppConfig() {
                             </div>
                         </div>
 
-                        {/* Admin Fee Setting */}
-                        <div className="flex items-center justify-between">
-                            <div className="flex items-start gap-4">
+                        {/* SaaS / Admin Fee Configuration */}
+                        <div className="pt-4 border-t border-gray-100">
+                            <div className="flex items-start gap-4 mb-4">
                                 <div className="p-3 bg-amber-50 text-amber-600 rounded-xl">
                                     <ReceiptText size={24} />
                                 </div>
                                 <div>
-                                    <h3 className="font-bold text-gray-900 text-lg">{t('settings.appConfig.adminFee')}</h3>
-                                    <p className="text-gray-500 text-sm mt-1">{t('settings.appConfig.adminFee.desc')}</p>
+                                    <h3 className="font-bold text-gray-900 text-lg">SaaS / Admin Fee Configuration</h3>
+                                    <p className="text-gray-500 text-sm mt-1">Configure fees charged to customers or merchants.</p>
                                 </div>
                             </div>
 
-                            <select
-                                value={settings.ADMIN_FEE_MODE || 'DISABLED'}
-                                onChange={(e) => handleLocalChange('ADMIN_FEE_MODE', e.target.value)}
-                                className="bg-gray-50 border border-gray-200 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block p-2.5 outline-none font-medium min-w-[200px]"
-                            >
-                                <option value="DISABLED">{t('settings.appConfig.adminFee.disabled')}</option>
-                                <option value="PER_ITEM">{t('settings.appConfig.adminFee.perItem')}</option>
-                                <option value="PER_TRANSACTION">{t('settings.appConfig.adminFee.perTransaction')}</option>
-                            </select>
+                            <div className="bg-gray-50 p-6 rounded-xl space-y-6 border border-gray-200">
+                                {/* Scheme Selection */}
+                                <div>
+                                    <label className="block text-sm font-bold text-gray-700 mb-2">Fee Scheme</label>
+                                    {/* Using SAAS_FEE_TYPE instead of ADMIN_FEE_MODE */}
+                                    <div className="flex gap-2">
+                                        {['PER_ITEM', 'PER_TRANSACTION', 'PERCENTAGE'].map(scheme => (
+                                            <button
+                                                key={scheme}
+                                                onClick={() => handleLocalChange('SAAS_FEE_TYPE', scheme)}
+                                                className={`px-4 py-2 text-sm font-medium rounded-lg border transition-all ${settings.SAAS_FEE_TYPE === scheme
+                                                    ? 'bg-blue-600 text-white border-blue-600 shadow-sm'
+                                                    : 'bg-white text-gray-600 border-gray-200 hover:bg-gray-50'
+                                                    }`}
+                                            >
+                                                {scheme === 'PER_ITEM' && 'Rp / Item'}
+                                                {scheme === 'PER_TRANSACTION' && 'Rp / Transaction'}
+                                                {scheme === 'PERCENTAGE' && '% / Transaction'}
+                                            </button>
+                                        ))}
+                                    </div>
+                                </div>
+
+                                {/* Amount Input */}
+                                <div>
+                                    <label className="block text-sm font-bold text-gray-700 mb-2">
+                                        {settings.SAAS_FEE_TYPE === 'PERCENTAGE' ? 'Percentage (%)' : 'Amount (Rp)'}
+                                    </label>
+                                    <input
+                                        type="number"
+                                        value={settings.SAAS_FEE_AMOUNT || ''}
+                                        onChange={(e) => handleLocalChange('SAAS_FEE_AMOUNT', e.target.value)}
+                                        className="w-full md:w-1/2 p-2 border border-gray-300 rounded-lg font-mono"
+                                        placeholder="0"
+                                    />
+                                </div>
+
+                                {/* Charged To Config */}
+                                <div>
+                                    <label className="block text-sm font-bold text-gray-700 mb-2">Charge To (Billing Target)</label>
+                                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                        <div
+                                            onClick={() => handleLocalChange('SAAS_FEE_CHARGED_TO', 'CUSTOMER')}
+                                            className={`cursor-pointer p-4 rounded-lg border flex items-start gap-3 transition-all ${settings.SAAS_FEE_CHARGED_TO === 'CUSTOMER' ? 'bg-blue-50 border-blue-300 ring-1 ring-blue-300' : 'bg-white border-gray-200 hover:border-blue-300'}`}
+                                        >
+                                            <div className={`w-4 h-4 rounded-full mt-1 flex-shrink-0 border ${settings.SAAS_FEE_CHARGED_TO === 'CUSTOMER' ? 'border-4 border-blue-600' : 'border-gray-300'}`}></div>
+                                            <div>
+                                                <span className="font-bold text-gray-900 block">Customer</span>
+                                                <p className="text-xs text-gray-500 mt-1">Fee added to invoice. Customer pays.</p>
+                                            </div>
+                                        </div>
+
+                                        <div
+                                            onClick={() => handleLocalChange('SAAS_FEE_CHARGED_TO', 'MERCHANT')}
+                                            className={`cursor-pointer p-4 rounded-lg border flex items-start gap-3 transition-all ${settings.SAAS_FEE_CHARGED_TO === 'MERCHANT' ? 'bg-purple-50 border-purple-300 ring-1 ring-purple-300' : 'bg-white border-gray-200 hover:border-purple-300'}`}
+                                        >
+                                            <div className={`w-4 h-4 rounded-full mt-1 flex-shrink-0 border ${settings.SAAS_FEE_CHARGED_TO === 'MERCHANT' ? 'border-4 border-purple-600' : 'border-gray-300'}`}></div>
+                                            <div>
+                                                <span className="font-bold text-gray-900 block">Merchant</span>
+                                                <p className="text-xs text-gray-500 mt-1">Logged silently. Owner owes provider.</p>
+                                            </div>
+                                        </div>
+
+                                        <div
+                                            onClick={() => handleLocalChange('SAAS_FEE_CHARGED_TO', 'NONE')}
+                                            className={`cursor-pointer p-4 rounded-lg border flex items-start gap-3 transition-all ${settings.SAAS_FEE_CHARGED_TO === 'NONE' ? 'bg-gray-100 border-gray-300' : 'bg-white border-gray-200 hover:border-gray-300'}`}
+                                        >
+                                            <div className={`w-4 h-4 rounded-full mt-1 flex-shrink-0 border ${settings.SAAS_FEE_CHARGED_TO === 'NONE' ? 'border-4 border-gray-500' : 'border-gray-300'}`}></div>
+                                            <div>
+                                                <span className="font-bold text-gray-900 block">Disabled</span>
+                                                <p className="text-xs text-gray-500 mt-1">No fees applied.</p>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
                         </div>
 
                         {/* Tax Rate Setting */}

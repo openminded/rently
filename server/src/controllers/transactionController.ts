@@ -16,12 +16,17 @@ export const transactionController = {
             // In a more complex system, we might just reserve "count", but for now, we lock instances.
             const quantityRequests = items.filter((i: any) => i.variantId && i.quantity > 0);
 
-            // Fetch Settings
+            // Fetch Settings (Laundry & SaaS)
             const settings = await prisma.appSetting.findMany({
-                where: { key: { in: ['ENABLE_MAX_LAUNDRY_DAY', 'MAX_LAUNDRY_DAYS'] } }
+                where: { key: { in: ['ENABLE_MAX_LAUNDRY_DAY', 'MAX_LAUNDRY_DAYS', 'SAAS_FEE_TYPE', 'SAAS_FEE_AMOUNT', 'SAAS_FEE_CHARGED_TO'] } }
             });
             const enableLaundryRule = settings.find(s => s.key === 'ENABLE_MAX_LAUNDRY_DAY')?.value === 'true';
             const laundryDays = parseInt(settings.find(s => s.key === 'MAX_LAUNDRY_DAYS')?.value || '0');
+
+            // SaaS Settings
+            const saasFeeType = settings.find(s => s.key === 'SAAS_FEE_TYPE')?.value || 'PER_ITEM';
+            const saasFeeAmount = parseFloat(settings.find(s => s.key === 'SAAS_FEE_AMOUNT')?.value || '0');
+            const saasChargedTo = settings.find(s => s.key === 'SAAS_FEE_CHARGED_TO')?.value || 'NONE';
 
             // Normalize Requested Dates
             const reqStart = new Date(pickupDate);
@@ -35,7 +40,7 @@ export const transactionController = {
                 const availableInstances = await prisma.itemInstance.findMany({
                     where: {
                         itemVariantId: reqItem.variantId,
-                        status: { in: ['AVAILABLE', 'RENTED'] } // Allow Available or Currently Rented (for future booking check)
+                        status: { in: ['AVAILABLE', 'RENTED', 'IN_LAUNDRY'] } // Allow all valid physical states
                     },
                     include: {
                         transactionItems: {
@@ -93,64 +98,11 @@ export const transactionController = {
                     const price = instance.itemVariant.item.rentalPrice;
                     totalAmount += price;
 
-                    // Allow RENTED if it's a re-rental check?? No, for new transaction must be AVAILABLE
-                    // UPDATE: With Laundry Rule, we allow 'RENTED' if we validated availability by date.
-                    // So we remove this strict check OR we check if it is truly available NOW vs FUTURE.
-                    // The `assignedSkus` are already validated for the date range.
-                    // However, we still need to mark it as 'RENTED' or 'BOOKED' to block others.
-
-                    // IF the start date is in the future, the current status might be 'RENTED' (by someone else).
-                    // We should NOT change the status to 'RENTED' blindly if it's a future booking.
-                    // Ideally, we should insert a Transaction, and 'ItemInstance.status' should reflect CURRENT state.
-                    // But our system seems to rely on 'ItemInstance.status' = 'RENTED' for blocking?
-                    // If so, a future booking cannot set status to RENTED now if it is currently RENTED by someone else.
-                    // Wait, if it is currently 'AVAILABLE', and we book for next month, we set 'BOOKED' on transaction.
-                    // Does 'ItemInstance' need to change?
-                    // If 'ItemInstance' status is just a snapshot of "Right Now", then we can leave it as is?
-                    // But `getItems` filters by `instances: { where: { status: 'AVAILABLE' } }` (in some places).
-                    // If we don't update ItemInstance, `getItems` claims it's available.
-                    // But `createConfig` verifies dates.
-
-                    // DECISION:
-                    // 1. Remove strict `instance.status !== 'AVAILABLE'` check here.
-                    // 2. Only update `ItemInstance.status` to 'BOOKED' or 'RENTED' if the transaction starts TODAY (or very soon).
-                    //    OR if we want to "reserve" it, maybe we don't change ItemInstance status for future bookings?
-                    //    But if we don't change it, how do we prevent someone else from picking it up *now* if they don't check dates?
-                    //    -> They check dates now (we just added the logic).
-                    //    So we can rely on Transaction overlap checks.
-
-                    // However, for immediate pickup (Rent), we MUST set to RENTED.
-                    // For Booking, we can leave it or set to something?
-                    // If we set to RENTED/BOOKED, it blocks *current* usage if logic checks status.
-                    // Current logic: `availableInstances` checks `transactionItems` overlap.
-                    // It does NOT rely on `ItemInstance.status` anymore (we commented it out).
-                    // So `ItemInstance.status` is less critical for *availability loop*, but useful for "Where is this item right now?".
-
-                    // Logic:
-                    // If type == IMMEDIATE (Pickup Now), update status to RENTED.
-                    // If type == BOOKING (Future), do NOT update status (effectively).
-                    // OR only update if it is currently AVAILABLE?
-                    // Let's stick to: Update status only if starting now?
-                    // But `createConfig` is usually for Booking?
-
-                    // Simple approach:
-                    // If `pickupDate` is TODAY/NOW, set to RENTED/BOOKED.
-                    // If `pickupDate` is FUTURE, leave it?
-                    // But what if it is currently AVAILABLE and we book for future? It remains AVAILABLE.
-                    // Then someone rents it NOW. The overlap check will see the future booking and ensure they return it in time.
-                    // Yes!
-
                     if (type === 'IMMEDIATE') {
-                        // Must be available NOW?
-                        // If we passed the date check, it means it's free NOW for the duration.
-                        // So we set to RENTED.
                         await tx.itemInstance.update({
                             where: { sku },
                             data: { status: 'RENTED' }
                         });
-                    } else {
-                        // For BOOKING, we don't change instance status immediately.
-                        // The existence of the Transaction record blocks conflicting dates.
                     }
 
                     transactionItemsData.push({
@@ -159,75 +111,81 @@ export const transactionController = {
                     });
                 }
 
-                // Payment Status Logic
-                // Total to Pay = Rental Price + Deposit (if any)
-                const depositVal = req.body.depositAmount ? parseFloat(req.body.depositAmount) : 0;
-                // If deposit is included in "payment" logic, we need to know if the "Total Bill" includes deposit or not.
-                // Usually Deposit is separate. 
-                // Let's assume Total Amount = Rental + Deposit.
-                // But generally Deposit is refundable, not "Revenue".
-                // Allow TotalAmount to be just Rental. Deposit is stored in depositAmount.
-                // But user has to PAY (Rental + Deposit).
-                // Frontend POS usually sums them up.
-                // So checking `paid >= totalAmount` might be tricky if `totalAmount` doesn't include deposit.
+                // --- SaaS Fee Calculation ---
+                let calculatedSaasFee = 0;
+                let feeDetails = '';
 
-                // DECISION: `totalAmount` should ONLY be the Rental/Item Costs (Revenue).
-                // `depositAmount` is separate.
-                // BUT `paidAmount` comes from user paying the SUM.
-                // So `paid >= totalAmount + depositAmount` is the check for "PAID".
-
-                const totalObligation = totalAmount + depositVal + parseFloat(adminFee as string || '0') + parseFloat(taxAmount as string || '0');
-
-                const paid = payment ? parseFloat(payment.amount) : 0;
-                let payStatus = 'UNPAID';
-                if (paid >= totalObligation) payStatus = 'PAID';
-                else if (paid > 0) payStatus = 'PARTIAL';
-
-                // Transaction Status Logic
-                const txStatus = type === 'IMMEDIATE' ? 'RENTED' : 'BOOKED';
-
-                // Create Header
-                const transactionData: any = {
-                    type: type || 'BOOKING',
-                    customerId,
-                    userId: req.user?.id ?? null, // Track who created the booking
-                    pickupDate: new Date(pickupDate),
-                    returnPlanDate: new Date(returnPlanDate),
-                    status: txStatus as any, // Cast to any to avoid Enum TS issues with provisional types
-                    totalAmount: totalAmount,
-                    depositAmount: depositVal,
-                    depositStatus: depositVal > 0 ? 'HELD' : null,
-                    paidAmount: paid,
-                    adminFee: parseFloat(adminFee as string || '0'),
-                    taxRate: parseFloat(taxRate as string || '0'),
-                    taxAmount: parseFloat(taxAmount as string || '0'),
-                    paymentStatus: payStatus as any,
-                    items: {
-                        create: transactionItemsData
+                if (saasChargedTo !== 'NONE') {
+                    if (saasFeeType === 'PER_ITEM') {
+                        calculatedSaasFee = saasFeeAmount * transactionItemsData.length;
+                        feeDetails = `Rp ${saasFeeAmount.toLocaleString()} x ${transactionItemsData.length} Items`;
+                    } else if (saasFeeType === 'PER_TRANSACTION') {
+                        calculatedSaasFee = saasFeeAmount;
+                        feeDetails = `Fixed Per Transaction`;
+                    } else if (saasFeeType === 'PERCENTAGE') {
+                        calculatedSaasFee = (saasFeeAmount / 100) * totalAmount;
+                        feeDetails = `${saasFeeAmount}% of Rp ${totalAmount.toLocaleString()}`;
                     }
-                };
-                if (payment) {
-                    transactionData.payments = {
-                        create: {
-                            amount: paid,
-                            paymentMethodId: payment.methodId,
-                            note: payment.note,
-                            createdById: req.user?.id ?? null // Track payment receiver
-                        }
-                    };
                 }
-                const transaction = await tx.transaction.create({
-                    data: transactionData,
-                    include: {
-                        items: true,
-                        payments: true
+
+                // If Charged to CUSTOMER, add to adminFee
+                const finalAdminFee = (adminFee || 0) + (saasChargedTo === 'CUSTOMER' ? calculatedSaasFee : 0);
+
+                const newTransaction = await tx.transaction.create({
+                    data: {
+                        type,
+                        customer: { connect: { id: customerId } },
+                        ...(req.user?.id ? { user: { connect: { id: req.user.id } } } : {}),
+                        pickupDate: new Date(pickupDate),
+                        returnPlanDate: new Date(returnPlanDate),
+                        status: type === 'IMMEDIATE' ? 'RENTED' : 'BOOKED',
+                        totalAmount: totalAmount + finalAdminFee + taxAmount, // Total includes SaaS fee if customer pays
+                        adminFee: finalAdminFee,
+                        taxRate,
+                        taxAmount,
+                        items: {
+                            create: transactionItemsData
+                        },
                     }
                 });
 
-                return transaction;
+                // --- Log SaaS Fee ---
+                if (saasChargedTo !== 'NONE' && calculatedSaasFee > 0) {
+                    await tx.saaSFeeLog.create({
+                        data: {
+                            transactionId: newTransaction.id,
+                            amount: calculatedSaasFee,
+                            chargedTo: saasChargedTo,
+                            calculationDetails: feeDetails
+                        }
+                    });
+                }
+
+                // Payment Handling
+                if (payment) {
+                    await tx.payment.create({
+                        data: {
+                            transactionId: newTransaction.id,
+                            amount: payment.amount,
+                            paymentMethodId: payment.methodId,
+                            createdById: req.user?.id ?? null
+                        }
+                    });
+
+                    // Update Paid Amount
+                    await tx.transaction.update({
+                        where: { id: newTransaction.id },
+                        data: {
+                            paidAmount: payment.amount,
+                            paymentStatus: payment.amount >= (totalAmount + finalAdminFee + taxAmount) ? 'PAID' : 'PARTIAL' // Update logic as needed
+                        }
+                    });
+                }
+
+                return newTransaction;
             });
 
-            res.status(201).json(result);
+            res.json(result);
 
         } catch (error: any) {
             console.error(error);
@@ -591,6 +549,7 @@ export const transactionController = {
     getByItemSku: async (req: Request, res: Response) => {
         try {
             const { sku } = req.params;
+            if (!sku) return res.status(400).json({ error: 'SKU is required' });
 
             // Find transaction that has this item and is currently active (RENTED or BOOKED)
             // Ideally RENTED for returns.
@@ -722,6 +681,7 @@ export const transactionController = {
     getVariantSchedule: async (req: Request, res: Response) => {
         try {
             const { variantId } = req.params;
+            if (!variantId) return res.status(400).json({ error: 'Variant ID is required' });
 
             // Fetch Settings for Laundry Rule
             const settings = await prisma.appSetting.findMany({
@@ -733,7 +693,7 @@ export const transactionController = {
 
             // 1. Get all instances for this variant
             const instances = await prisma.itemInstance.findMany({
-                where: { itemVariantId: parseInt(variantId) },
+                where: { itemVariantId: parseInt(variantId as string) },
                 select: { sku: true }
             });
             const skus = instances.map(i => i.sku);

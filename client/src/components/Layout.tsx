@@ -167,6 +167,13 @@ export default function Layout() {
                         </NavLink>
                     )}
 
+                    {/* User Management Menu (Owner, Superadmin, Supervisor) */}
+                    {hasRole(['SUPERADMIN', 'OWNER', 'SUPERVISOR']) && (
+                        <NavLink to="/app/users" onClick={() => setMobileMenuOpen(false)} className={({ isActive }) => clsx("flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors mt-2", isActive ? "bg-indigo-600 text-white" : "text-gray-500 hover:bg-gray-100 hover:text-gray-900")}>
+                            <User size={18} /> {t('menu.userManagement')}
+                        </NavLink>
+                    )}
+
                     {/* Master Groups */}
                     <div className="pt-2">
                         <button
@@ -242,11 +249,6 @@ export default function Layout() {
                                     {hasRole(['SUPERADMIN', 'SUPERVISOR']) && (
                                         <NavLink to="/app/settings/backup-restore" onClick={() => setMobileMenuOpen(false)} className={({ isActive }) => clsx("block py-1.5 text-sm transition-colors", isActive ? "text-gray-900 font-medium" : "text-gray-500 hover:text-gray-900")}>
                                             {t('menu.backupRestore')}
-                                        </NavLink>
-                                    )}
-                                    {hasRole(['SUPERADMIN', 'OWNER']) && (
-                                        <NavLink to="/app/settings/users" onClick={() => setMobileMenuOpen(false)} className={({ isActive }) => clsx("block py-1.5 text-sm transition-colors", isActive ? "text-gray-900 font-medium" : "text-gray-500 hover:text-gray-900")}>
-                                            {t('menu.userManagement')}
                                         </NavLink>
                                     )}
                                     {hasRole(['SUPERADMIN', 'OWNER']) && (

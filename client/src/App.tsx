@@ -29,6 +29,7 @@ import AppConfig from './pages/settings/AppConfig';
 import Broadcast from './pages/Broadcast';
 import Finance from './pages/Finance';
 import BrandSync from './components/BrandSync';
+import NotFound from './pages/NotFound';
 
 function App() {
   return (
@@ -75,9 +76,11 @@ function App() {
               <Route path="masters/laundry-partners" element={<LaundryPartner />} />
               <Route path="masters/deposit-variants" element={<DepositVariants />} />
 
+              {/* User Management */}
+              <Route path="users" element={<UserManagement />} />
+
               {/* Settings Routes */}
               <Route path="settings/backup-restore" element={<BackupRestore />} />
-              <Route path="settings/users" element={<UserManagement />} />
               <Route path="settings/brand" element={<Settings />} />
               <Route path="settings/app-config" element={<AppConfig />} />
               <Route path="broadcast" element={<Broadcast />} />
@@ -86,7 +89,12 @@ function App() {
               {/* Finance Route */}
               <Route path="finance" element={<Finance />} />
 
+
             </Route>
+
+
+            {/* 404 Not Found Route */}
+            <Route path="*" element={<NotFound />} />
           </Routes>
         </AuthProvider>
       </BrowserRouter>

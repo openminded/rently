@@ -503,7 +503,7 @@ export default function Transactions({ type: initialType }: TransactionsProps) {
     // Laundry Table Render
     if (currentType === 'laundry') {
         return (
-            <div className="p-6 max-w-7xl mx-auto space-y-6">
+            <div className="p-6 max-w-full mx-auto space-y-6">
                 <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
                     <h1 className="text-2xl font-bold flex items-center gap-2">
                         <Wallet className="text-purple-600" /> {t('menu.transactions')}
@@ -661,6 +661,7 @@ export default function Transactions({ type: initialType }: TransactionsProps) {
                 <Eye size={16} />
             </button>
 
+            {/* Waiting Pickup Actions */}
             {(currentType === 'waiting-pickup') && (
                 <div className="flex gap-2">
                     {checkExpired(tx) ? (
@@ -698,6 +699,29 @@ export default function Transactions({ type: initialType }: TransactionsProps) {
                 </div>
             )}
 
+            {/* Booking Actions */}
+            {currentType === 'booking' && (
+                <div className="flex gap-2">
+                    <button
+                        onClick={() => handlePickupClick(tx)}
+                        className={`px-3 py-1.5 text-white rounded text-xs font-bold bg-gray-900 hover:bg-gray-800`}
+                    >
+                        {t('transactions.action.pickup')}
+                    </button>
+
+                    {hasRole(['SUPERADMIN', 'SUPERVISOR', 'OWNER']) && (
+                        <button
+                            onClick={() => handleInvalidClick(tx)}
+                            className="px-3 py-1.5 text-red-600 border border-red-200 hover:bg-red-50 rounded text-xs"
+                            title="Mark as Invalid"
+                        >
+                            Invalid
+                        </button>
+                    )}
+                </div>
+            )}
+
+            {/* Rent & Return Actions */}
             {(currentType === 'rent' || currentType === 'need-return') && (
                 <button
                     onClick={() => handleReturnClick(tx)}
@@ -709,8 +733,9 @@ export default function Transactions({ type: initialType }: TransactionsProps) {
         </div>
     );
 
+
     return (
-        <div className="p-6 max-w-7xl mx-auto space-y-6">
+        <div className="p-6 max-w-full mx-auto space-y-6">
             <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
                 <h1 className="text-2xl font-bold flex items-center gap-2">
                     <Wallet className="text-purple-600" /> {t('menu.transactions')}

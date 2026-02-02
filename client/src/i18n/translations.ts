@@ -55,6 +55,8 @@ export const translations = {
         "common.update": "Update",
         "common.newItem": "New Item",
         "common.editItem": "Edit Item",
+        "common.notFound": "Page Not Found",
+        "common.notFoundDesc": "Oops! The page you are looking for does not exist or has been moved.",
 
         // Auth
         "auth.signIn": "Sign In",
@@ -137,6 +139,7 @@ export const translations = {
         "finance.chart.expenseComposition": "Expense Composition",
         "finance.table.expenseByCategory": "Expense Detail by Category",
         "finance.uncategorized": "Uncategorized",
+        "finance.saasBill": "App Bill",
         "pos.alert.selectPayment": "Select payment method",
         "pos.alert.fullPayment": "For Direct Pickup, full payment ({amount}) is required.",
         "pos.alert.dpRequired": "For Booking, a Down Payment (DP) is required.",
@@ -558,6 +561,8 @@ export const translations = {
         "common.update": "Perbarui",
         "common.newItem": "Item Baru",
         "common.editItem": "Ubah Item",
+        "common.notFound": "Halaman Tidak Ditemukan",
+        "common.notFoundDesc": "Oops! Halaman yang Anda cari tidak ada atau telah dipindahkan.",
 
         // Auth
         "auth.signIn": "Masuk",
@@ -593,7 +598,9 @@ export const translations = {
         "pos.change": "Kembalian",
         "pos.remaining": "Sisa Tagihan",
         "pos.process.immediate": "Proses Pembayaran & Ambil",
-        "pos.process.booking": "Proses Booking",
+        "finance.table.expenseByCategory": "Detail Pengeluaran per Kategori",
+        "finance.uncategorized": "Tanpa Kategori",
+        "finance.saasBill": "Tagihan Aplikasi",
         "pos.addCustomer.title": "Tambah Pelanggan Baru",
         "pos.addCustomer.success": "Pelanggan berhasil ditambahkan!",
         "pos.addCustomer.error": "Gagal menambahkan pelanggan",

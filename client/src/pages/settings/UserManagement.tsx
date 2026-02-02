@@ -9,11 +9,16 @@ import { API_BASE_URL } from '../../config/api';
 const API_URL = `${API_BASE_URL}/users`;
 
 export default function UserManagement() {
-    const { token } = useAuth();
+    const { token, hasRole } = useAuth();
     const { t } = useLanguage();
     const [users, setUsers] = useState<any[]>([]);
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [currentItem, setCurrentItem] = useState<any>(null);
+
+    // Access Control
+    if (!hasRole(['SUPERADMIN', 'OWNER', 'SUPERVISOR'])) {
+        return <div className="p-8 text-center text-red-500">{t('common.error')}</div>;
+    }
 
     useEffect(() => {
         fetchUsers();
@@ -25,7 +30,8 @@ export default function UserManagement() {
                 headers: { 'Authorization': `Bearer ${token}` }
             });
             const data = await res.json();
-            setUsers(Array.isArray(data) ? data : []);
+            // FILTER OUT SUPERADMIN
+            setUsers(Array.isArray(data) ? data.filter((u: any) => u.role !== 'SUPERADMIN') : []);
         } catch (error) {
             console.error(error);
         }
@@ -90,10 +96,9 @@ export default function UserManagement() {
             sortable: true,
             cell: (row) => (
                 <span className={`px-2 py-1 rounded-full text-xs font-medium 
-                    ${row.role === 'SUPERADMIN' ? 'bg-purple-100 text-purple-700' :
-                        row.role === 'OWNER' ? 'bg-blue-100 text-blue-700' :
-                            row.role === 'SUPERVISOR' ? 'bg-orange-100 text-orange-700' :
-                                'bg-green-100 text-green-700'}`}>
+                    ${row.role === 'OWNER' ? 'bg-blue-100 text-blue-700' :
+                        row.role === 'SUPERVISOR' ? 'bg-orange-100 text-orange-700' :
+                            'bg-green-100 text-green-700'}`}>
                     {row.role}
                 </span>
             )
@@ -167,7 +172,6 @@ export default function UserManagement() {
                                     <option value="KASIR">KASIR</option>
                                     <option value="SUPERVISOR">SUPERVISOR</option>
                                     <option value="OWNER">OWNER</option>
-                                    <option value="SUPERADMIN">SUPERADMIN</option>
                                 </select>
                             </div>
                             <div>

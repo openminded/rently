@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { useLanguage } from '../../context/LanguageContext';
-import { Save, Building, Phone, Globe, MessageCircle, WashingMachine } from 'lucide-react';
+import { Save, Building, Phone, Globe, MessageCircle, WashingMachine, DollarSign } from 'lucide-react';
 
 import { API_BASE_URL } from '../../config/api';
 
@@ -19,7 +19,10 @@ export default function Settings() {
         BRAND_TAGLINE: '',
         BRAND_LOGO: '',
         ENABLE_MAX_LAUNDRY_DAY: 'false',
-        MAX_LAUNDRY_DAYS: '0'
+        MAX_LAUNDRY_DAYS: '0',
+        SAAS_FEE_TYPE: 'PER_ITEM',
+        SAAS_FEE_AMOUNT: '0',
+        SAAS_FEE_CHARGED_TO: 'NONE' // NONE, CUSTOMER, MERCHANT
     });
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
@@ -81,7 +84,7 @@ export default function Settings() {
     if (loading) return <div>{t('common.loading')}</div>;
 
     return (
-        <div className="p-6 max-w-4xl mx-auto">
+        <div className="p-6 max-w-full mx-auto">
             <h1 className="text-2xl font-bold mb-6 flex items-center gap-2">
                 <Building /> {t('settings.title')}
             </h1>
@@ -226,6 +229,103 @@ export default function Settings() {
                                 </p>
                             </div>
                         )}
+                    </div>
+                </div>
+
+                <div className="pt-4 border-t border-gray-100">
+                    <h2 className="text-lg font-bold mb-4 flex items-center gap-2">
+                        <DollarSign size={20} /> SaaS / Admin Fee Configuration
+                    </h2>
+                    <div className="bg-gray-50 p-4 rounded-xl space-y-4 border border-gray-200">
+                        {/* Scheme Selection */}
+                        <div>
+                            <label className="block text-sm font-bold text-gray-700 mb-2">Fee Scheme</label>
+                            <div className="flex gap-2">
+                                {['PER_ITEM', 'PER_TRANSACTION', 'PERCENTAGE'].map(scheme => (
+                                    <button
+                                        key={scheme}
+                                        onClick={() => handleChange({ target: { name: 'SAAS_FEE_TYPE', value: scheme } } as any)}
+                                        className={`px-4 py-2 text-sm font-medium rounded-lg border transition-all ${settings.SAAS_FEE_TYPE === scheme
+                                            ? 'bg-blue-600 text-white border-blue-600 shadow-sm'
+                                            : 'bg-white text-gray-600 border-gray-200 hover:bg-gray-50'
+                                            }`}
+                                    >
+                                        {scheme === 'PER_ITEM' && 'Rp / Item'}
+                                        {scheme === 'PER_TRANSACTION' && 'Rp / Transaction'}
+                                        {scheme === 'PERCENTAGE' && '% / Transaction'}
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
+
+                        {/* Amount Input */}
+                        <div>
+                            <label className="block text-sm font-bold text-gray-700 mb-2">
+                                {settings.SAAS_FEE_TYPE === 'PERCENTAGE' ? 'Percentage (%)' : 'Amount (Rp)'}
+                            </label>
+                            <input
+                                type="number"
+                                name="SAAS_FEE_AMOUNT"
+                                value={settings.SAAS_FEE_AMOUNT}
+                                onChange={handleChange}
+                                className="w-full md:w-1/2 p-2 border border-gray-300 rounded-lg font-mono"
+                                placeholder="0"
+                            />
+                        </div>
+
+                        {/* Charged To Config (The User's "2 Toggles" Request interpreted as Options) */}
+                        <div>
+                            <label className="block text-sm font-bold text-gray-700 mb-2">Charge To</label>
+                            <div className="space-y-2">
+                                {/* Option 1: Customer */}
+                                <label className="flex items-center gap-3 p-3 bg-white border border-gray-200 rounded-lg cursor-pointer hover:bg-blue-50 transition-colors">
+                                    <input
+                                        type="radio"
+                                        name="SAAS_FEE_CHARGED_TO"
+                                        value="CUSTOMER"
+                                        checked={settings.SAAS_FEE_CHARGED_TO === 'CUSTOMER'}
+                                        onChange={handleChange}
+                                        className="w-5 h-5 text-blue-600"
+                                    />
+                                    <div>
+                                        <span className="font-bold text-gray-800">Customer (Renter)</span>
+                                        <p className="text-xs text-gray-500">Fee is added to the invoice as "Admin Fee". Customer pays.</p>
+                                    </div>
+                                </label>
+
+                                {/* Option 2: Merchant */}
+                                <label className="flex items-center gap-3 p-3 bg-white border border-gray-200 rounded-lg cursor-pointer hover:bg-blue-50 transition-colors">
+                                    <input
+                                        type="radio"
+                                        name="SAAS_FEE_CHARGED_TO"
+                                        value="MERCHANT"
+                                        checked={settings.SAAS_FEE_CHARGED_TO === 'MERCHANT'}
+                                        onChange={handleChange}
+                                        className="w-5 h-5 text-blue-600"
+                                    />
+                                    <div>
+                                        <span className="font-bold text-gray-800">Merchant (Owner)</span>
+                                        <p className="text-xs text-gray-500">Fee is calculated internally. Customer does NOT see it. Owner owes this to App Provider.</p>
+                                    </div>
+                                </label>
+
+                                {/* Option 3: Disabled */}
+                                <label className="flex items-center gap-3 p-3 bg-white border border-gray-200 rounded-lg cursor-pointer hover:bg-red-50 transition-colors">
+                                    <input
+                                        type="radio"
+                                        name="SAAS_FEE_CHARGED_TO"
+                                        value="NONE"
+                                        checked={!settings.SAAS_FEE_CHARGED_TO || settings.SAAS_FEE_CHARGED_TO === 'NONE'}
+                                        onChange={handleChange}
+                                        className="w-5 h-5 text-gray-400"
+                                    />
+                                    <div>
+                                        <span className="font-bold text-gray-800">Disabled</span>
+                                        <p className="text-xs text-gray-500">No admin fee charged.</p>
+                                    </div>
+                                </label>
+                            </div>
+                        </div>
                     </div>
                 </div>
 

@@ -86,7 +86,19 @@ export const userController = {
         try {
             const { id } = req.params;
 
-            // Prevent deleting self (optional check, good generic practice)
+            // Fetch user first
+            const targetUser = await prisma.user.findUnique({ where: { id: Number(id) } });
+
+            if (!targetUser) {
+                return res.status(404).json({ error: 'User not found' });
+            }
+
+            // CRITICAL: Prevent SUPERADMIN deletion
+            if (targetUser.role === 'SUPERADMIN') {
+                return res.status(403).json({ error: 'Cannot delete SUPERADMIN user.' });
+            }
+
+            // Prevent deleting self
             // @ts-ignore
             if (req.user?.id === Number(id)) {
                 return res.status(400).json({ error: 'Cannot delete your own account' });

@@ -6,6 +6,7 @@ import dashboardRoutes from './routes/dashboardRoutes.js';
 import userRoutes from './routes/userRoutes.js';
 import whatsappRoutes from './routes/whatsappRoutes.js';
 import broadcastRoutes from './routes/broadcastRoutes.js';
+import saasRoutes from './routes/saasRoutes.js';
 import { whatsappService } from './services/whatsappService.js';
 import { initBroadcastJob } from './jobs/broadcastJob.js';
 import { initReminderJob } from './jobs/reminderJob.js';
@@ -29,6 +30,7 @@ app.use('/api/dashboard', dashboardRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/whatsapp', whatsappRoutes);
 app.use('/api/broadcast', broadcastRoutes);
+app.use('/api/saas', saasRoutes);
 
 // Initialize Services
 whatsappService.connect().catch((err: any) => console.error('Failed to init WhatsApp:', err));
