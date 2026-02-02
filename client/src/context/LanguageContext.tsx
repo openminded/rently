@@ -21,7 +21,7 @@ export function LanguageProvider({ children }: { children: React.ReactNode }) {
     }, [language]);
 
     const t = (key: TranslationKey, params?: Record<string, string | number>) => {
-        let text = translations[language][key] || key;
+        let text = (translations[language] as any)[key] || key;
         if (params) {
             Object.keys(params).forEach(param => {
                 text = text.replace(`{{${param}}}`, String(params[param])).replace(`{${param}}`, String(params[param]));
