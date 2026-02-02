@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { useLanguage } from '../../context/LanguageContext';
-import { Save, Building, Phone, Globe, MessageCircle } from 'lucide-react';
+import { Save, Building, Phone, Globe, MessageCircle, WashingMachine } from 'lucide-react';
 
 import { API_BASE_URL } from '../../config/api';
 
@@ -17,7 +17,9 @@ export default function Settings() {
         BRAND_WA: '',
         BRAND_SOCIAL: '',
         BRAND_TAGLINE: '',
-        BRAND_LOGO: ''
+        BRAND_LOGO: '',
+        ENABLE_MAX_LAUNDRY_DAY: 'false',
+        MAX_LAUNDRY_DAYS: '0'
     });
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
@@ -43,7 +45,8 @@ export default function Settings() {
     };
 
     const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
-        setSettings({ ...settings, [e.target.name]: e.target.value });
+        const value = e.target.type === 'checkbox' ? (e.target as HTMLInputElement).checked.toString() : e.target.value;
+        setSettings({ ...settings, [e.target.name]: value });
     };
 
     const handleSave = async () => {
@@ -184,6 +187,46 @@ export default function Settings() {
                         className="w-full p-2 border border-gray-300 rounded-lg"
                         placeholder="@instagram_handle"
                     />
+                </div>
+
+                <div className="pt-4 border-t border-gray-100">
+                    <h2 className="text-lg font-bold mb-4 flex items-center gap-2">
+                        <WashingMachine size={20} /> Laundry Rules
+                    </h2>
+                    <div className="space-y-4">
+                        <div className="flex items-center gap-3">
+                            <input
+                                type="checkbox"
+                                id="ENABLE_MAX_LAUNDRY_DAY"
+                                name="ENABLE_MAX_LAUNDRY_DAY"
+                                checked={settings.ENABLE_MAX_LAUNDRY_DAY === 'true'}
+                                onChange={handleChange}
+                                className="w-5 h-5 text-blue-600 rounded focus:ring-blue-500"
+                            />
+                            <label htmlFor="ENABLE_MAX_LAUNDRY_DAY" className="text-sm font-medium text-gray-700">
+                                Enable Maximum Laundry Day Rule
+                            </label>
+                        </div>
+
+                        {settings.ENABLE_MAX_LAUNDRY_DAY === 'true' && (
+                            <div>
+                                <label className="block text-sm font-bold text-gray-700 mb-2">
+                                    Laundry Buffer (Days)
+                                </label>
+                                <input
+                                    type="number"
+                                    name="MAX_LAUNDRY_DAYS"
+                                    value={settings.MAX_LAUNDRY_DAYS}
+                                    onChange={handleChange}
+                                    min="0"
+                                    className="w-full md:w-32 p-2 border border-gray-300 rounded-lg"
+                                />
+                                <p className="text-xs text-gray-500 mt-1">
+                                    Items cannot be booked for this many days after return.
+                                </p>
+                            </div>
+                        )}
+                    </div>
                 </div>
 
                 <div className="pt-6 border-t border-gray-100 flex justify-end">

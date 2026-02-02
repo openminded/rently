@@ -25,10 +25,13 @@ router.get('/', async (req, res) => {
     await transactionController.getAll(req, res);
 });
 
+router.post('/check-availability', transactionController.checkAvailability);
+router.get('/schedule/:variantId', transactionController.getVariantSchedule);
 router.post('/:id/pay', transactionController.addPayment);
 router.post('/:id/pickup', transactionController.pickup);
 router.post('/:id/return', transactionController.returnItems);
 router.put('/:id/invalid', transactionController.markInvalid);
+router.get('/items/:sku/active', transactionController.getByItemSku);
 
 // Explicitly define getById
 router.get('/:id', async (req, res) => {

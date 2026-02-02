@@ -3,6 +3,7 @@ import { AuthProvider, ProtectedRoute } from './context/AuthContext';
 import { LanguageProvider } from './context/LanguageContext';
 import Login from './pages/Login';
 import LandingPage from './pages/LandingPage';
+import WerentlyLanding from './pages/WerentlyLanding';
 import Layout from './components/Layout';
 import Dashboard from './pages/Dashboard';
 import POS from './pages/POS';
@@ -40,7 +41,8 @@ function App() {
             <Route path="/invoice/:id" element={<Invoice />} />
 
             {/* Public Routes */}
-            <Route path="/" element={<LandingPage />} />
+            <Route path="/" element={<WerentlyLanding />} />
+            <Route path="/store" element={<LandingPage />} />
             <Route path="/login" element={<Login />} />
 
             {/* Protected App Routes */}

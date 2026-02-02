@@ -8,9 +8,10 @@ interface ProductDetailProps {
     onClose: () => void;
     onEdit?: (item: any) => void;
     hideEditButton?: boolean;
+    customVariantRenderer?: (variant: any) => React.ReactNode;
 }
 
-export default function ProductDetail({ item, onClose, onEdit, hideEditButton = false }: ProductDetailProps) {
+export default function ProductDetail({ item, onClose, onEdit, hideEditButton = false, customVariantRenderer }: ProductDetailProps) {
     const { t } = useLanguage();
     const [activeImage, setActiveImage] = useState(0);
 
@@ -79,20 +80,27 @@ export default function ProductDetail({ item, onClose, onEdit, hideEditButton = 
                             <div className="space-y-3">
                                 {item.variants && item.variants.length > 0 ? (
                                     item.variants.map((v: any) => (
-                                        <div key={v.id} className="flex items-center justify-between bg-white p-3 rounded-lg border border-gray-100 shadow-sm">
-                                            <div className="flex items-center gap-3">
-                                                <div className="w-4 h-4 rounded-full border shadow-sm" style={{ backgroundColor: v.color?.hexCode }}></div>
-                                                <span className="font-medium text-gray-700">{v.size?.name} - {v.color?.name}</span>
+                                        <div key={v.id} className="flex flex-col gap-2 mb-2 border-b border-gray-100 last:border-0 pb-2">
+                                            <div className="flex items-center justify-between bg-white p-3 rounded-lg border border-gray-100 shadow-sm">
+                                                <div className="flex items-center gap-3">
+                                                    <div className="w-4 h-4 rounded-full border shadow-sm" style={{ backgroundColor: v.color?.hexCode }}></div>
+                                                    <span className="font-medium text-gray-700">{v.size?.name} - {v.color?.name}</span>
+                                                </div>
+                                                {/* Stock fetching logic */}
+                                                {(() => {
+                                                    // use _count.instances from backend if available (handles date logic)
+                                                    const available = (v._count?.instances !== undefined)
+                                                        ? v._count.instances
+                                                        : (v.instances?.filter((i: any) => i.status === 'AVAILABLE').length || 0);
+
+                                                    return (
+                                                        <span className={`text-sm font-semibold px-2 py-1 rounded ${available > 0 ? 'text-green-600 bg-green-50' : 'text-red-600 bg-red-50'}`}>
+                                                            {available} {t('product.available')}
+                                                        </span>
+                                                    );
+                                                })()}
                                             </div>
-                                            {/* Stock fetching logic */}
-                                            {(() => {
-                                                const available = v.instances?.filter((i: any) => i.status === 'AVAILABLE').length || 0;
-                                                return (
-                                                    <span className={`text-sm font-semibold px-2 py-1 rounded ${available > 0 ? 'text-green-600 bg-green-50' : 'text-red-600 bg-red-50'}`}>
-                                                        {available} {t('product.available')}
-                                                    </span>
-                                                );
-                                            })()}
+                                            {customVariantRenderer && customVariantRenderer(v)}
                                         </div>
                                     ))
                                 ) : (
@@ -103,15 +111,15 @@ export default function ProductDetail({ item, onClose, onEdit, hideEditButton = 
                                 )}
                             </div>
                         </div>
+                    </div>
 
-                        <div className="flex gap-3">
-                            {!hideEditButton && onEdit && (
-                                <button onClick={() => onEdit(item)} className="flex-1 bg-gray-900 text-white py-3 rounded-xl font-medium hover:bg-gray-800 transition-colors">
-                                    {t('product.edit')}
-                                </button>
-                            )}
-                            {/* Further actions like Deactivate */}
-                        </div>
+                    <div className="flex gap-3">
+                        {!hideEditButton && onEdit && (
+                            <button onClick={() => onEdit(item)} className="flex-1 bg-gray-900 text-white py-3 rounded-xl font-medium hover:bg-gray-800 transition-colors">
+                                {t('product.edit')}
+                            </button>
+                        )}
+                        {/* Further actions like Deactivate */}
                     </div>
                 </div>
             </div>

@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useLanguage } from '../context/LanguageContext';
-import { Search, Box } from 'lucide-react';
+import { Search, Box, Calendar, ChevronDown, ChevronUp } from 'lucide-react';
 import ProductDetail from '../components/ProductDetail';
 
 import { API_BASE_URL, getImageUrl } from '../config/api';
@@ -23,17 +23,37 @@ export default function Showcase() {
 
     // Detail View
     const [selectedItem, setSelectedItem] = useState<any>(null);
+    const [viewScheduleId, setViewScheduleId] = useState<number | null>(null);
+    const [scheduleData, setScheduleData] = useState<any[]>([]);
+    const [loadingSchedule, setLoadingSchedule] = useState(false);
+
+    // Date Filter State
+    const [dateRange, setDateRange] = useState<{ start: string, end: string }>({ start: '', end: '' });
 
     useEffect(() => {
         if (token) {
-            fetchItems();
             fetchCategories();
         }
     }, [token]);
 
+    useEffect(() => {
+        if (token) {
+            setLoading(true);
+            const timer = setTimeout(() => {
+                fetchItems();
+            }, 500);
+            return () => clearTimeout(timer);
+        }
+    }, [token, dateRange]);
+
     const fetchItems = async () => {
         try {
-            const res = await fetch(`${API_URL}/items`, {
+            const params = new URLSearchParams();
+            if (dateRange.start && dateRange.end) {
+                params.append('startDate', dateRange.start);
+                params.append('endDate', dateRange.end);
+            }
+            const res = await fetch(`${API_URL}/items?${params.toString()}`, {
                 headers: { 'Authorization': `Bearer ${token}` }
             });
             const data = await res.json();
@@ -63,11 +83,17 @@ export default function Showcase() {
         let rented = 0;
 
         item.variants?.forEach((v: any) => {
-            if (v.instances) {
-                total += v.instances.length;
-                available += v.instances.filter((i: any) => i.status === 'AVAILABLE').length;
-                rented += v.instances.filter((i: any) => i.status === 'RENTED').length;
-            }
+            // Use _count.instances provided by backend (which handles date filtering logic)
+            // Fallback to manual filter if _count missing (shouldn't happen with updated backend)
+            available += (v._count?.instances !== undefined)
+                ? v._count.instances
+                : (v.instances?.filter((i: any) => i.status === 'AVAILABLE').length || 0);
+
+            // Total is total physical instances
+            total += v.instances?.length || 0;
+
+            // Rented info is less critical for the summary card, but we can keep approx
+            rented += v.instances?.filter((i: any) => i.status === 'RENTED').length || 0;
         });
         return { total, available, rented };
     };
@@ -90,8 +116,10 @@ export default function Showcase() {
             result = result.filter(i => i.categoryId === parseInt(selectedCategory));
         }
 
-        // 3. Status Filter
-        if (filterType === 'AVAILABLE') {
+        // 3. Status Filter (Manual or Date-Driven)
+        // If Date Range is selected, ONLY show available items (User Request)
+        const hasDateRange = dateRange.start && dateRange.end;
+        if (filterType === 'AVAILABLE' || hasDateRange) {
             result = result.filter(i => getItemStats(i).available > 0);
         }
 
@@ -134,6 +162,26 @@ export default function Showcase() {
                     </div>
 
                     <div className="flex flex-wrap gap-2">
+                        {/* Date Filter */}
+                        <div className="flex items-center gap-2 bg-white border border-gray-200 rounded-lg px-3 py-2">
+                            <Calendar size={16} className="text-gray-400" />
+                            <div className="flex items-center gap-2">
+                                <input
+                                    type="date"
+                                    className="text-sm outline-none text-gray-600 bg-transparent"
+                                    value={dateRange.start}
+                                    onChange={(e) => setDateRange({ ...dateRange, start: e.target.value })}
+                                />
+                                <span className="text-gray-400">→</span>
+                                <input
+                                    type="date"
+                                    className="text-sm outline-none text-gray-600 bg-transparent"
+                                    value={dateRange.end}
+                                    onChange={(e) => setDateRange({ ...dateRange, end: e.target.value })}
+                                />
+                            </div>
+                        </div>
+
                         {/* Category Dropdown */}
                         <select
                             value={selectedCategory}
@@ -173,7 +221,7 @@ export default function Showcase() {
             ) : processedItems.length === 0 ? (
                 <div className="text-center py-20 bg-white rounded-xl border border-gray-100">
                     <Box size={48} className="mx-auto text-gray-300 mb-2" />
-                    <p className="text-gray-500">{t('common.noData')}</p>
+                    <p className="text-gray-500">{t('common.noData')} - Try adjusting filters or date range.</p>
                 </div>
             ) : (
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
@@ -242,14 +290,84 @@ export default function Showcase() {
                 </div>
             )}
 
-            {/* Detail Modal */}
+            {/* Detail Modal Overlay with Custom Schedule Logic */}
             {selectedItem && (
-                <ProductDetail
-                    item={selectedItem}
-                    onClose={() => setSelectedItem(null)}
-                    onEdit={() => { }}
-                    hideEditButton={true}
-                />
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+                    <div className="bg-white rounded-2xl w-full max-w-4xl max-h-[90vh] overflow-y-auto relative">
+                        <button
+                            onClick={() => setSelectedItem(null)}
+                            className="absolute top-4 right-4 p-2 hover:bg-gray-100 rounded-full z-10"
+                        >
+                            <Box className="rotate-45" size={20} />
+                        </button>
+
+                        <div className="p-6">
+                            <ProductDetail
+                                item={selectedItem}
+                                onClose={() => setSelectedItem(null)}
+                                onEdit={() => { }}
+                                hideEditButton={true}
+                                customVariantRenderer={(variant: any) => (
+                                    <div className="mt-2">
+                                        <button
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                if (viewScheduleId === variant.id) {
+                                                    setViewScheduleId(null);
+                                                } else {
+                                                    setViewScheduleId(variant.id);
+                                                    setLoadingSchedule(true);
+                                                    fetch(`${API_URL}/transactions/schedule/${variant.id}`, {
+                                                        headers: { 'Authorization': `Bearer ${token}` }
+                                                    })
+                                                        .then(res => res.json())
+                                                        .then(data => setScheduleData(data))
+                                                        .catch(err => console.error(err))
+                                                        .finally(() => setLoadingSchedule(false));
+                                                }
+                                            }}
+                                            className="w-full py-2 text-xs font-medium text-gray-500 hover:text-blue-600 hover:bg-blue-50 flex items-center justify-center gap-1 transition-colors border-t border-gray-100"
+                                        >
+                                            <Calendar size={14} />
+                                            {viewScheduleId === variant.id ? 'Hide Schedule' : 'Check Schedule'}
+                                            {viewScheduleId === variant.id ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+                                        </button>
+
+                                        {viewScheduleId === variant.id && (
+                                            <div className="bg-gray-50 p-3 text-xs border-t border-gray-100">
+                                                {loadingSchedule ? (
+                                                    <div className="text-center py-2 text-gray-400">Loading schedule...</div>
+                                                ) : scheduleData.length === 0 ? (
+                                                    <div className="text-center py-2 text-green-600 font-medium">No active bookings. Fully available.</div>
+                                                ) : (
+                                                    <div className="space-y-2">
+                                                        <p className="font-bold text-gray-700 mb-2">Unavailable Dates (Booking + Cleaning):</p>
+                                                        {scheduleData.map((event: any) => (
+                                                            <div key={event.id} className="flex justify-between items-start bg-white p-2 rounded border border-gray-200">
+                                                                <div>
+                                                                    <div className="font-medium text-gray-900">
+                                                                        {new Date(event.start).toLocaleDateString()} - {new Date(event.end).toLocaleDateString()}
+                                                                    </div>
+                                                                    <div className="text-[10px] text-gray-400">
+                                                                        Busy until: <span className="text-red-500">{new Date(event.busyUntil).toLocaleDateString()}</span>
+                                                                    </div>
+                                                                </div>
+                                                                <div className="text-right">
+                                                                    <div className="font-medium text-blue-900">{event.customer}</div>
+                                                                    <div className="text-[10px] text-gray-400 capitalize">{event.status.replace('_', ' ')}</div>
+                                                                </div>
+                                                            </div>
+                                                        ))}
+                                                    </div>
+                                                )}
+                                            </div>
+                                        )}
+                                    </div>
+                                )}
+                            />
+                        </div>
+                    </div>
+                </div>
             )}
         </div>
     );

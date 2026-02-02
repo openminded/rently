@@ -18,6 +18,7 @@ router.get('/variants/:variantId/stock', inventoryController.getVariantStock);
 
 // Stock (instances)
 router.post('/stock', inventoryController.addStock);
+router.get('/sku/:sku', inventoryController.getInstanceBySku);
 
 // History
 router.get('/resume', inventoryController.getResume);

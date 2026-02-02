@@ -1,6 +1,6 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { Eye, CheckCircle, Printer, WashingMachine, Wallet, AlertTriangle, Calendar, ShoppingCart, Clock } from 'lucide-react';
+import { Eye, CheckCircle, Printer, WashingMachine, Wallet, AlertTriangle, Calendar, ShoppingCart, Clock, Search } from 'lucide-react';
 import { clsx } from 'clsx';
 import { DataTable, type Column } from '../components/common/DataTable';
 import { useAuth } from '../context/AuthContext';
@@ -9,6 +9,8 @@ import { useLanguage } from '../context/LanguageContext';
 import { API_BASE_URL } from '../config/api';
 
 const API_URL = API_BASE_URL;
+
+import { useBarcodeScanner } from '../hooks/useBarcodeScanner';
 
 interface TransactionsProps {
     type: 'booking' | 'waiting-pickup' | 'rent' | 'need-return' | 'laundry' | 'completed';
@@ -46,6 +48,7 @@ export default function Transactions({ type: initialType }: TransactionsProps) {
         return today > expireDate;
     };
     const [dateRange, setDateRange] = useState({ start: '', end: '' });
+    const [searchTerm, setSearchTerm] = useState('');
     const [laundryItems, setLaundryItems] = useState<any[]>([]); // For Laundry Tab
 
     // Modal States
@@ -138,8 +141,22 @@ export default function Transactions({ type: initialType }: TransactionsProps) {
             });
         }
 
+        // 3. Filter by Search Term (Custom implementation)
+        if (searchTerm) {
+            const lowerTerm = searchTerm.toLowerCase();
+            filtered = filtered.filter((t: any) => {
+                const idMatch = t.id.toString().includes(lowerTerm);
+                const customerMatch = t.customer?.name?.toLowerCase().includes(lowerTerm);
+                const itemMatch = t.items?.some((i: any) =>
+                    (i.itemInstanceSku?.toLowerCase().includes(lowerTerm)) ||
+                    (i.itemInstance?.itemVariant?.item?.name?.toLowerCase().includes(lowerTerm))
+                );
+                return idMatch || customerMatch || itemMatch;
+            });
+        }
+
         setTransactions(filtered);
-    }, [rawData, currentType, dateRange]);
+    }, [rawData, currentType, dateRange, searchTerm]);
 
     const fetchData = async () => {
         try {
@@ -449,6 +466,38 @@ export default function Transactions({ type: initialType }: TransactionsProps) {
         });
     };
 
+    // Barcode Scanner Logic
+    const handleScan = useCallback(async (code: string) => {
+        if (!token) return;
+        console.log("Tx Scan:", code);
+
+        try {
+            // Search Active Transaction by Item SKU
+            const res = await fetch(`${API_URL}/transactions/items/${code}/active`, {
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+
+            if (res.ok) {
+                const tx = await res.json();
+
+                if (tx.status === 'BOOKED') {
+                    handlePickupClick(tx);
+                } else if (tx.status === 'RENTED') {
+                    handleReturnClick(tx);
+                } else {
+                    alert(`Transaction status is ${tx.status}`);
+                }
+            } else {
+                alert('No active transaction found for this item.');
+            }
+        } catch (e) {
+            console.error("Scan Error", e);
+        }
+    }, [token]);
+
+    useBarcodeScanner(handleScan);
+
+
     // --- RENDER HELPERS ---
 
     // Laundry Table Render
@@ -563,6 +612,24 @@ export default function Transactions({ type: initialType }: TransactionsProps) {
                         )}
                     </span>
                     <span className="text-red-600 text-xs">{t('transactions.table.ret')}: {new Date(tx.returnPlanDate).toLocaleDateString()}</span>
+                </div>
+            )
+        },
+        {
+            header: t('inventory.table.item'),
+            accessorKey: 'items',
+            className: 'w-64',
+            cell: (tx) => (
+                <div className="flex flex-col gap-1">
+                    {tx.items?.slice(0, 3).map((i: any, idx: number) => (
+                        <div key={idx} className="text-xs">
+                            <span className="font-medium">{i.itemInstance?.itemVariant?.item?.name || 'Unknown'}</span>
+                            <span className="text-gray-500 ml-1">({i.itemInstanceSku || i.itemInstance?.sku})</span>
+                        </div>
+                    ))}
+                    {(tx.items?.length || 0) > 3 && (
+                        <span className="text-xs text-gray-400 italic">+{tx.items.length - 3} more...</span>
+                    )}
                 </div>
             )
         },
@@ -695,7 +762,17 @@ export default function Transactions({ type: initialType }: TransactionsProps) {
                         </h2>
                     </div>
 
-                    <div className="flex gap-2">
+                    <div className="flex gap-2 items-center">
+                        <div className="relative">
+                            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400" size={14} />
+                            <input
+                                type="text"
+                                placeholder="Search ID, Name, SKU..."
+                                className="pl-8 pr-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none w-64"
+                                value={searchTerm}
+                                onChange={(e) => setSearchTerm(e.target.value)}
+                            />
+                        </div>
                         <input
                             type="date"
                             className="px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none"
@@ -715,7 +792,8 @@ export default function Transactions({ type: initialType }: TransactionsProps) {
                 <DataTable
                     data={transactions}
                     columns={columns}
-                    searchKeys={['id', 'customer.name', 'status']}
+                    searchKeys={[]} // Disabled internal search
+                    hideSearch={true} // Custom search above
                     actions={actionColumn}
                 />
             </div>

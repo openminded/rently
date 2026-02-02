@@ -31,7 +31,7 @@ app.use('/api/whatsapp', whatsappRoutes);
 app.use('/api/broadcast', broadcastRoutes);
 
 // Initialize Services
-whatsappService.init().catch((err: any) => console.error('Failed to init WhatsApp:', err));
+whatsappService.connect().catch((err: any) => console.error('Failed to init WhatsApp:', err));
 initBroadcastJob();
 // initReminderJob(); // Disabled per user request (Manual Trigger only)
 

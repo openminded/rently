@@ -16,22 +16,65 @@ export const transactionController = {
             // In a more complex system, we might just reserve "count", but for now, we lock instances.
             const quantityRequests = items.filter((i: any) => i.variantId && i.quantity > 0);
 
-            for (const req of quantityRequests) {
+            // Fetch Settings
+            const settings = await prisma.appSetting.findMany({
+                where: { key: { in: ['ENABLE_MAX_LAUNDRY_DAY', 'MAX_LAUNDRY_DAYS'] } }
+            });
+            const enableLaundryRule = settings.find(s => s.key === 'ENABLE_MAX_LAUNDRY_DAY')?.value === 'true';
+            const laundryDays = parseInt(settings.find(s => s.key === 'MAX_LAUNDRY_DAYS')?.value || '0');
+
+            // Normalize Requested Dates
+            const reqStart = new Date(pickupDate);
+            const reqEnd = new Date(returnPlanDate);
+            reqStart.setHours(0, 0, 0, 0);
+            reqEnd.setHours(0, 0, 0, 0);
+            const reqBuffer = enableLaundryRule ? laundryDays : 0;
+
+            for (const reqItem of quantityRequests) {
                 // Find N available instances
                 const availableInstances = await prisma.itemInstance.findMany({
                     where: {
-                        itemVariantId: req.variantId,
-                        status: 'AVAILABLE'
+                        itemVariantId: reqItem.variantId,
+                        status: { in: ['AVAILABLE', 'RENTED'] } // Allow Available or Currently Rented (for future booking check)
                     },
-                    take: req.quantity
+                    include: {
+                        transactionItems: {
+                            where: { transaction: { status: { in: ['BOOKED', 'WAITING_PICKUP', 'RENTED'] } } },
+                            include: { transaction: true }
+                        }
+                    }
                 });
 
-                if (availableInstances.length < req.quantity) {
-                    res.status(400).json({ error: `Not enough stock for variant ${req.variantId}` });
+                // Filter valid instances
+                const validInstances = availableInstances.filter(instance => {
+                    const hasConflict = instance.transactionItems.some(ti => {
+                        const tx = ti.transaction;
+                        const txStart = new Date(tx.pickupDate);
+                        const txEnd = new Date(tx.returnPlanDate);
+                        txStart.setHours(0, 0, 0, 0);
+                        txEnd.setHours(0, 0, 0, 0);
+
+                        // Check 1: New Req overlaps Existing [Start, End + Buffer]
+                        const txEffectiveEnd = new Date(txEnd);
+                        txEffectiveEnd.setDate(txEffectiveEnd.getDate() + reqBuffer);
+                        const overlap1 = (reqStart <= txEffectiveEnd) && (reqEnd >= txStart);
+
+                        // Check 2: Existing overlaps New Req [Start, End + Buffer]
+                        const reqEffectiveEnd = new Date(reqEnd);
+                        reqEffectiveEnd.setDate(reqEffectiveEnd.getDate() + reqBuffer);
+                        const overlap2 = (txStart <= reqEffectiveEnd) && (txEnd >= reqStart);
+
+                        return overlap1 || overlap2;
+                    });
+                    return !hasConflict;
+                });
+
+                if (validInstances.length < reqItem.quantity) {
+                    res.status(400).json({ error: `Not enough availability for variant ${reqItem.variantId} on selected dates.` });
                     return;
                 }
 
-                assignedSkus.push(...availableInstances.map(i => i.sku));
+                assignedSkus.push(...validInstances.slice(0, reqItem.quantity).map(i => i.sku));
             }
 
             // 2. Wrap in transaction
@@ -47,19 +90,68 @@ export const transactionController = {
 
                     if (!instance) throw new Error(`Instance ${sku} not found`);
 
-                    // Allow RENTED if it's a re-rental check?? No, for new transaction must be AVAILABLE
-                    if (instance.status !== 'AVAILABLE') throw new Error(`Instance ${sku} is ${instance.status}`);
-
                     const price = instance.itemVariant.item.rentalPrice;
                     totalAmount += price;
 
-                    // Update Status
-                    // Even if BOOKING, we mark as RENTED (or similar) to reserve it from being taken by others.
-                    // Ideally we should have a 'BOOKED' status on ItemInstance, but 'RENTED' works to block it for now.
-                    await tx.itemInstance.update({
-                        where: { sku },
-                        data: { status: 'RENTED' }
-                    });
+                    // Allow RENTED if it's a re-rental check?? No, for new transaction must be AVAILABLE
+                    // UPDATE: With Laundry Rule, we allow 'RENTED' if we validated availability by date.
+                    // So we remove this strict check OR we check if it is truly available NOW vs FUTURE.
+                    // The `assignedSkus` are already validated for the date range.
+                    // However, we still need to mark it as 'RENTED' or 'BOOKED' to block others.
+
+                    // IF the start date is in the future, the current status might be 'RENTED' (by someone else).
+                    // We should NOT change the status to 'RENTED' blindly if it's a future booking.
+                    // Ideally, we should insert a Transaction, and 'ItemInstance.status' should reflect CURRENT state.
+                    // But our system seems to rely on 'ItemInstance.status' = 'RENTED' for blocking?
+                    // If so, a future booking cannot set status to RENTED now if it is currently RENTED by someone else.
+                    // Wait, if it is currently 'AVAILABLE', and we book for next month, we set 'BOOKED' on transaction.
+                    // Does 'ItemInstance' need to change?
+                    // If 'ItemInstance' status is just a snapshot of "Right Now", then we can leave it as is?
+                    // But `getItems` filters by `instances: { where: { status: 'AVAILABLE' } }` (in some places).
+                    // If we don't update ItemInstance, `getItems` claims it's available.
+                    // But `createConfig` verifies dates.
+
+                    // DECISION:
+                    // 1. Remove strict `instance.status !== 'AVAILABLE'` check here.
+                    // 2. Only update `ItemInstance.status` to 'BOOKED' or 'RENTED' if the transaction starts TODAY (or very soon).
+                    //    OR if we want to "reserve" it, maybe we don't change ItemInstance status for future bookings?
+                    //    But if we don't change it, how do we prevent someone else from picking it up *now* if they don't check dates?
+                    //    -> They check dates now (we just added the logic).
+                    //    So we can rely on Transaction overlap checks.
+
+                    // However, for immediate pickup (Rent), we MUST set to RENTED.
+                    // For Booking, we can leave it or set to something?
+                    // If we set to RENTED/BOOKED, it blocks *current* usage if logic checks status.
+                    // Current logic: `availableInstances` checks `transactionItems` overlap.
+                    // It does NOT rely on `ItemInstance.status` anymore (we commented it out).
+                    // So `ItemInstance.status` is less critical for *availability loop*, but useful for "Where is this item right now?".
+
+                    // Logic:
+                    // If type == IMMEDIATE (Pickup Now), update status to RENTED.
+                    // If type == BOOKING (Future), do NOT update status (effectively).
+                    // OR only update if it is currently AVAILABLE?
+                    // Let's stick to: Update status only if starting now?
+                    // But `createConfig` is usually for Booking?
+
+                    // Simple approach:
+                    // If `pickupDate` is TODAY/NOW, set to RENTED/BOOKED.
+                    // If `pickupDate` is FUTURE, leave it?
+                    // But what if it is currently AVAILABLE and we book for future? It remains AVAILABLE.
+                    // Then someone rents it NOW. The overlap check will see the future booking and ensure they return it in time.
+                    // Yes!
+
+                    if (type === 'IMMEDIATE') {
+                        // Must be available NOW?
+                        // If we passed the date check, it means it's free NOW for the duration.
+                        // So we set to RENTED.
+                        await tx.itemInstance.update({
+                            where: { sku },
+                            data: { status: 'RENTED' }
+                        });
+                    } else {
+                        // For BOOKING, we don't change instance status immediately.
+                        // The existence of the Transaction record blocks conflicting dates.
+                    }
 
                     transactionItemsData.push({
                         itemInstanceSku: sku,
@@ -493,5 +585,213 @@ export const transactionController = {
             console.error(error);
             res.status(500).json({ error: "Failed to invalidate transaction" });
         }
+    },
+
+    // Find Active Transaction by Item SKU (for Barcode Return)
+    getByItemSku: async (req: Request, res: Response) => {
+        try {
+            const { sku } = req.params;
+
+            // Find transaction that has this item and is currently active (RENTED or BOOKED)
+            // Ideally RENTED for returns.
+            // If checking for "Waiting Pickup", check BOOKED.
+            // Let's return the most relevant one.
+
+            const transaction = await prisma.transaction.findFirst({
+                where: {
+                    items: {
+                        some: {
+                            itemInstanceSku: String(sku)
+                        }
+                    },
+                    status: {
+                        in: ['RENTED', 'BOOKED']
+                    }
+                },
+                include: {
+                    customer: true,
+                    items: {
+                        include: {
+                            itemInstance: {
+                                include: {
+                                    itemVariant: {
+                                        include: {
+                                            item: true,
+                                            size: true,
+                                            color: true
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    payments: { include: { paymentMethod: true } },
+                    fines: { include: { violationType: true } }
+                }
+            });
+
+            if (!transaction) {
+                return res.status(404).json({ error: 'No active transaction found for this item' });
+            }
+
+            res.json(transaction);
+        } catch (error) {
+            console.error("getByItemSku error:", error);
+            res.status(500).json({ error: 'Failed to find transaction' });
+        }
+    },
+
+    // Check Availability for POS Feedback
+    checkAvailability: async (req: Request, res: Response) => {
+        try {
+            const { items, pickupDate, returnPlanDate } = req.body;
+            // items: [{ variantId, quantity }]
+
+            // Fetch Settings
+            const settings = await prisma.appSetting.findMany({
+                where: { key: { in: ['ENABLE_MAX_LAUNDRY_DAY', 'MAX_LAUNDRY_DAYS'] } }
+            });
+            const enableLaundryRule = settings.find(s => s.key === 'ENABLE_MAX_LAUNDRY_DAY')?.value === 'true';
+            const laundryDays = parseInt(settings.find(s => s.key === 'MAX_LAUNDRY_DAYS')?.value || '0');
+
+            // Normalize Requested Dates
+            const reqStart = new Date(pickupDate);
+            const reqEnd = new Date(returnPlanDate);
+            reqStart.setHours(0, 0, 0, 0);
+            reqEnd.setHours(0, 0, 0, 0);
+            const reqBuffer = enableLaundryRule ? laundryDays : 0;
+
+            const results = [];
+
+            for (const item of items) {
+                // Find potential instances
+                const availableInstances = await prisma.itemInstance.findMany({
+                    where: {
+                        itemVariantId: item.variantId,
+                        status: { in: ['AVAILABLE', 'RENTED', 'IN_LAUNDRY'] }
+                    },
+                    include: {
+                        transactionItems: {
+                            where: { transaction: { status: { in: ['BOOKED', 'WAITING_PICKUP', 'RENTED'] } } },
+                            include: { transaction: true }
+                        }
+                    }
+                });
+
+                // Filter valid
+                const validInstances = availableInstances.filter(instance => {
+                    const hasConflict = instance.transactionItems.some(ti => {
+                        const tx = ti.transaction;
+                        const txStart = new Date(tx.pickupDate);
+                        const txEnd = new Date(tx.returnPlanDate);
+                        txStart.setHours(0, 0, 0, 0);
+                        txEnd.setHours(0, 0, 0, 0);
+
+                        // Check 1: New Req overlaps Existing [Start, End + Buffer]
+                        const txEffectiveEnd = new Date(txEnd);
+                        txEffectiveEnd.setDate(txEffectiveEnd.getDate() + reqBuffer);
+                        const overlap1 = (reqStart <= txEffectiveEnd) && (reqEnd >= txStart);
+
+                        // Check 2: Existing overlaps New Req [Start, End + Buffer]
+                        const reqEffectiveEnd = new Date(reqEnd);
+                        reqEffectiveEnd.setDate(reqEffectiveEnd.getDate() + reqBuffer);
+                        const overlap2 = (txStart <= reqEffectiveEnd) && (txEnd >= reqStart);
+
+                        return overlap1 || overlap2;
+                    });
+                    return !hasConflict;
+                });
+
+                results.push({
+                    variantId: item.variantId,
+                    available: validInstances.length >= item.quantity,
+                    availableCount: validInstances.length,
+                    requestedParams: { reqStart, reqEnd, reqBuffer } // Debug info
+                });
+            }
+
+            res.json({ results });
+
+        } catch (error: any) {
+            console.error(error);
+            res.status(500).json({ error: error.message || 'Check failed' });
+        }
+    },
+
+    // Get Variant Schedule for POS
+    getVariantSchedule: async (req: Request, res: Response) => {
+        try {
+            const { variantId } = req.params;
+
+            // Fetch Settings for Laundry Rule
+            const settings = await prisma.appSetting.findMany({
+                where: { key: { in: ['ENABLE_MAX_LAUNDRY_DAY', 'MAX_LAUNDRY_DAYS'] } }
+            });
+            const enableLaundryRule = settings.find(s => s.key === 'ENABLE_MAX_LAUNDRY_DAY')?.value === 'true';
+            const laundryDays = parseInt(settings.find(s => s.key === 'MAX_LAUNDRY_DAYS')?.value || '0');
+            const buffer = enableLaundryRule ? laundryDays : 0;
+
+            // 1. Get all instances for this variant
+            const instances = await prisma.itemInstance.findMany({
+                where: { itemVariantId: parseInt(variantId) },
+                select: { sku: true }
+            });
+            const skus = instances.map(i => i.sku);
+
+            if (skus.length === 0) {
+                return res.json([]);
+            }
+
+            // 2. Find all active transactions for these SKUs
+            // We look for transactions that are BOOKED, WAITING_PICKUP, or RENTED
+            const transactions = await prisma.transaction.findMany({
+                where: {
+                    status: { in: ['BOOKED', 'WAITING_PICKUP', 'RENTED'] },
+                    items: {
+                        some: {
+                            itemInstanceSku: { in: skus }
+                        }
+                    }
+                },
+                include: {
+                    customer: { select: { name: true } },
+                    items: {
+                        where: { itemInstanceSku: { in: skus } },
+                        select: { itemInstanceSku: true }
+                    }
+                },
+                orderBy: { pickupDate: 'asc' }
+            });
+
+            // 3. Map to simple schedule events
+            const schedule = transactions.map(tx => {
+                const start = new Date(tx.pickupDate);
+                const end = new Date(tx.returnPlanDate);
+
+                // Add buffer to end date for "Busy" visualization
+                const busyUntil = new Date(end);
+                busyUntil.setDate(busyUntil.getDate() + buffer);
+
+                // Which instance is this for? (Just grabbing the first match if multiple same variant in one tx?? Rare but possible)
+                const sku = tx.items[0]?.itemInstanceSku || 'Unknown';
+
+                return {
+                    id: tx.id,
+                    start: start.toISOString().split('T')[0],
+                    end: end.toISOString().split('T')[0],
+                    busyUntil: busyUntil.toISOString().split('T')[0],
+                    customer: tx.customer.name,
+                    status: tx.status,
+                    sku: sku
+                };
+            });
+
+            res.json(schedule);
+
+        } catch (error: any) {
+            console.error("Get Schedule Error", error);
+            res.status(500).json({ error: error.message });
+        }
     }
 };
+

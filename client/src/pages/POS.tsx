@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { Search, Plus, ShoppingCart, User, Calendar, Trash2 } from 'lucide-react';
+import { Search, Plus, ShoppingCart, User, Calendar, Trash2, ChevronDown, ChevronUp } from 'lucide-react';
 
 import { useAuth } from '../context/AuthContext';
 import { useLanguage } from '../context/LanguageContext';
@@ -8,7 +8,11 @@ import { API_BASE_URL, getImageUrl } from '../config/api';
 
 const API_URL = API_BASE_URL;
 
+import { useBarcodeScanner } from '../hooks/useBarcodeScanner';
+
 export default function POS() {
+    // ... previous code ...
+
     const { token } = useAuth();
     const { t } = useLanguage();
     const [cart, setCart] = useState<any[]>([]);
@@ -37,9 +41,9 @@ export default function POS() {
     const [searchQuery, setSearchQuery] = useState('');
     const [showCustomerSearch, setShowCustomerSearch] = useState(false);
     const [customerSearchTerm, setCustomerSearchTerm] = useState('');
+    const [pickupDate, setPickupDate] = useState(new Date().toISOString().split('T')[0]);
+    const [returnDate, setReturnDate] = useState(new Date(Date.now() + 3 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]); // Default +3 days
 
-    // Variant Selection Modal State
-    const [selectionModal, setSelectionModal] = useState<{ isOpen: boolean, item: any | null }>({ isOpen: false, item: null });
 
     // State for Payment Methods & Deposits
     const [paymentMethods, setPaymentMethods] = useState<any[]>([]);
@@ -58,6 +62,10 @@ export default function POS() {
         identityCardImage: null as File | null
     });
     const [isSubmittingCustomer, setIsSubmittingCustomer] = useState(false);
+
+    // Availability Check State
+    const [availabilityMap, setAvailabilityMap] = useState<{ [key: number]: boolean }>({});
+    const [checkingAvailability, setCheckingAvailability] = useState(false);
 
     const handleCustomerSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -99,7 +107,12 @@ export default function POS() {
         }
     };
 
-    // Initial load for masters
+    // State for Variant Selection Modal
+    const [selectionModal, setSelectionModal] = useState<{ isOpen: boolean, item: any | null }>({ isOpen: false, item: null });
+    // State for Variant Schedule View
+    const [viewScheduleId, setViewScheduleId] = useState<number | null>(null);
+    const [scheduleData, setScheduleData] = useState<any[]>([]);
+    const [loadingSchedule, setLoadingSchedule] = useState(false);
     useEffect(() => {
         if (!token) return;
         const fetchMasters = async () => {
@@ -155,7 +168,18 @@ export default function POS() {
         else setIsFetchingMore(true);
 
         try {
-            const res = await fetch(`${API_URL}/items?page=${currentPage}&limit=20&search=${search}`, {
+            const params = new URLSearchParams();
+            params.append('page', currentPage.toString());
+            params.append('limit', '20');
+            params.append('search', search);
+
+            // Add Date Filters if selected
+            if (pickupDate && returnDate) {
+                params.append('startDate', pickupDate);
+                params.append('endDate', returnDate);
+            }
+
+            const res = await fetch(`${API_URL}/items?${params.toString()}`, {
                 headers: { 'Authorization': `Bearer ${token}` }
             });
             const data = await res.json();
@@ -172,7 +196,7 @@ export default function POS() {
             setLoading(false);
             setIsFetchingMore(false);
         }
-    }, [token]);
+    }, [token, pickupDate, returnDate]); // Re-create when dates change
 
     // Handle Search Changes (Reset Pagination)
     useEffect(() => {
@@ -183,25 +207,30 @@ export default function POS() {
         }, 500); // 500ms debounce
         return () => clearTimeout(timer);
     }, [searchQuery, fetchItems]);
+    // Note: fetchItems now depends on dates, so this effect will also trigger when dates change 
+    // because fetchItems reference changes.
+    // However, we might want to be explicit or ensure we don't loop.
 
     // Handle Page Changes
     useEffect(() => {
         if (page > 1) {
             fetchItems(page, searchQuery);
         }
-    }, [page, fetchItems]); // SearchQuery is already handled by the search effect
+    }, [page, fetchItems]);
 
     const handleItemClick = (item: any) => {
-        const availableVariants = item.variants?.filter((v: any) => (v._count?.instances || 0) > 0) || [];
+        // Allow selection even if count is 0, to check for future availability
+        // But we need to know which variants exist.
+        const allVariants = item.variants || [];
 
-        if (availableVariants.length === 0) {
-            alert(t('pos.alert.noStock'));
+        if (allVariants.length === 0) {
+            // Truly no variants exists
             return;
         }
 
-        if (availableVariants.length === 1) {
+        if (allVariants.length === 1) {
             // Auto-select if only one
-            addVariantToCart(item, availableVariants[0]);
+            addVariantToCart(item, allVariants[0]);
         } else {
             // Open Selection Modal
             setSelectionModal({ isOpen: true, item: item });
@@ -210,13 +239,9 @@ export default function POS() {
 
     const addVariantToCart = (item: any, variant: any) => {
         // Check if already in cart and if we have enough stock vs cart quantity
-        const existing = cart.find(c => c.variantId === variant.id);
-        const currentCartQty = existing ? existing.quantity : 0;
+        // UPDATE: Removed strict stock limit check to allow booking check
 
-        if (currentCartQty + 1 > (variant._count?.instances || 0)) {
-            alert(t('pos.alert.stockLimit', { count: variant._count?.instances }));
-            return;
-        }
+        const existing = cart.find(c => c.variantId === variant.id);
 
         if (existing) {
             setCart(cart.map(c => c.variantId === variant.id ? { ...c, quantity: c.quantity + 1 } : c));
@@ -229,13 +254,52 @@ export default function POS() {
                 size: variant.size?.name,
                 color: variant.color?.name,
                 quantity: 1,
-                maxStock: variant._count?.instances, // Track max for validation
+                // Use total physical inventory (instances.length) as limit, not just currently available (_count)
+                maxStock: variant.instances?.length || variant._count?.instances || 0,
                 imageUrl: item.images?.[0]?.url
             }]);
         }
         // Close modal if open
         setSelectionModal({ isOpen: false, item: null });
     };
+
+    // Barcode Scanner Logic
+    const handleScan = useCallback(async (code: string) => {
+        if (!token) return;
+        console.log("Scanned Code:", code);
+
+        try {
+            const res = await fetch(`${API_URL}/items/sku/${code}`, {
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+
+            if (res.ok) {
+                const instance = await res.json();
+
+                if (instance && instance.itemVariant) {
+                    if (instance.status !== 'AVAILABLE') {
+                        alert(`Item not available. Status: ${instance.status}`);
+                        return;
+                    }
+
+                    const item = instance.itemVariant.item;
+                    const variant = instance.itemVariant;
+
+                    // Call addVariantToCart
+                    addVariantToCart(item, variant);
+                } else {
+                    alert('Item not found');
+                }
+            } else {
+                alert('Item not found');
+            }
+        } catch (error) {
+            console.error("Scan Error", error);
+        }
+    }, [token, cart, t]);
+
+    useBarcodeScanner(handleScan);
+
 
 
 
@@ -274,8 +338,49 @@ export default function POS() {
 
     const selectedDeposit = depositVariants.find(d => d.id === selectedDepositId);
     const depositAmount = selectedDeposit ? selectedDeposit.amount : 0;
-    const [pickupDate, setPickupDate] = useState(new Date().toISOString().split('T')[0]);
-    const [returnDate, setReturnDate] = useState(new Date(Date.now() + 3 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]); // Default +3 days
+
+    // Availability Check Effect
+    useEffect(() => {
+        if (cart.length === 0) {
+            setAvailabilityMap({});
+            return;
+        }
+
+        const checkAuth = async () => {
+            setCheckingAvailability(true);
+            try {
+                const res = await fetch(`${API_URL}/transactions/check-availability`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${token}`
+                    },
+                    body: JSON.stringify({
+                        items: cart.map(c => ({ variantId: c.variantId, quantity: c.quantity })),
+                        pickupDate,
+                        returnPlanDate: returnDate
+                    })
+                });
+
+                if (res.ok) {
+                    const data = await res.json();
+                    const newMap: { [key: number]: boolean } = {};
+                    data.results.forEach((r: any) => {
+                        newMap[r.variantId] = r.available;
+                    });
+                    setAvailabilityMap(newMap);
+                }
+            } catch (error) {
+                console.error("Availability Check Failed", error);
+            } finally {
+                setCheckingAvailability(false);
+            }
+        };
+
+        const timeoutId = setTimeout(checkAuth, 500); // Debounce
+        return () => clearTimeout(timeoutId);
+
+    }, [cart, pickupDate, returnDate, token]);
 
     // New State for Booking/Payment
     const [transactionType, setTransactionType] = useState<'BOOKING' | 'IMMEDIATE'>('BOOKING');
@@ -370,6 +475,8 @@ export default function POS() {
         <div className="flex h-[calc(100vh-theme(spacing.24))] gap-6">
             {/* Left Panel: Item Selection */}
             <div className="flex-1 flex flex-col gap-4">
+
+
                 {/* Search Bar */}
                 <div className="bg-white p-4 rounded-xl border border-gray-100 shadow-sm flex items-center gap-3">
                     <Search className="text-gray-400" />
@@ -404,6 +511,14 @@ export default function POS() {
                                 )}
                             </div>
                             <h3 className="font-semibold text-gray-900 line-clamp-1">{item.name}</h3>
+                            <p className="text-xs text-gray-400 font-mono mb-1">
+                                {(() => {
+                                    const skus = item.variants?.reduce((acc: any[], v: any) => acc.concat(v.instances?.map((i: any) => i.sku) || []), []).filter(Boolean) || [];
+                                    return skus.length > 0
+                                        ? (skus.slice(0, 2).join(', ') + (skus.length > 2 ? '...' : ''))
+                                        : 'No SKU';
+                                })()}
+                            </p>
                             <p className="text-sm text-gray-500">
                                 {(item.variants?.reduce((acc: number, v: any) => acc + (v._count?.instances || 0), 0) || 0) > 0
                                     ? `${item.variants.reduce((acc: number, v: any) => acc + (v._count?.instances || 0), 0)} ${t('pos.available')}`
@@ -424,6 +539,42 @@ export default function POS() {
 
             {/* Right Panel: Cart & Checkout */}
             <div className="w-96 bg-white rounded-2xl border border-gray-100 shadow-sm flex flex-col h-full">
+                {/* Date Filter - Moved to Right Panel */}
+                <div className="p-3 border-b border-gray-100 bg-gray-50 rounded-t-2xl">
+                    <div className="flex items-center gap-2 mb-2 text-gray-700 font-bold text-sm">
+                        <Calendar size={14} />
+                        <span>{t('pos.rentalPeriod')}</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                        <div className="flex-1">
+                            <label className="text-[10px] text-gray-500 mb-1 block">Pick Up</label>
+                            <input
+                                type="date"
+                                min={new Date().toISOString().split('T')[0]}
+                                value={pickupDate}
+                                onChange={(e) => setPickupDate(e.target.value)}
+                                className="w-full text-xs p-1.5 rounded-lg border border-gray-200 outline-none focus:border-blue-500 bg-white"
+                            />
+                        </div>
+                        <span className="text-gray-400 mt-4">→</span>
+                        <div className="flex-1">
+                            <label className="text-[10px] text-gray-500 mb-1 block">Return</label>
+                            <input
+                                type="date"
+                                min={pickupDate}
+                                value={returnDate}
+                                onChange={(e) => setReturnDate(e.target.value)}
+                                className="w-full text-xs p-1.5 rounded-lg border border-gray-200 outline-none focus:border-blue-500 bg-white"
+                            />
+                        </div>
+                    </div>
+                    {(!pickupDate || !returnDate) && (
+                        <div className="mt-2 text-[10px] text-orange-500 flex items-center gap-1 font-medium">
+                            <span>* Select dates to see availability</span>
+                        </div>
+                    )}
+                </div>
+
                 {/* Customer Section */}
                 <div className="p-3 border-b border-gray-100">
                     <div className="flex items-center justify-between mb-2">
@@ -496,7 +647,15 @@ export default function POS() {
                     ) : (
                         <div className="space-y-2">
                             {cart.map((item) => (
-                                <div key={item.variantId} className="bg-white p-2 rounded-xl border border-gray-100 shadow-sm flex gap-3 group">
+                                <div
+                                    key={item.variantId}
+                                    className={`p-2 rounded-xl border shadow-sm flex gap-3 group transition-colors ${availabilityMap[item.variantId] === false
+                                        ? 'bg-red-50 border-red-200'
+                                        : availabilityMap[item.variantId] === true
+                                            ? 'bg-green-50 border-green-200'
+                                            : 'bg-white border-gray-100'
+                                        }`}
+                                >
                                     <div className="w-12 h-12 bg-gray-100 rounded-lg flex-shrink-0 overflow-hidden">
                                         {item.imageUrl ? (
                                             <img
@@ -565,30 +724,8 @@ export default function POS() {
                         </button>
                     </div>
 
-                    <div className="flex items-center gap-2 text-gray-600">
-                        <Calendar size={14} />
-                        <span className="text-xs font-medium">{t('pos.rentalPeriod')}</span>
-                    </div>
-                    <div className="grid grid-cols-2 gap-2">
-                        <div>
-                            <input
-                                type="date"
-                                min={new Date().toISOString().split('T')[0]}
-                                value={pickupDate}
-                                onChange={(e) => setPickupDate(e.target.value)}
-                                className="w-full text-xs p-1.5 rounded-lg border border-gray-200 outline-none focus:border-blue-500"
-                            />
-                        </div>
-                        <div>
-                            <input
-                                type="date"
-                                min={pickupDate}
-                                value={returnDate}
-                                onChange={(e) => setReturnDate(e.target.value)}
-                                className="w-full text-xs p-1.5 rounded-lg border border-gray-200 outline-none focus:border-blue-500"
-                            />
-                        </div>
-                    </div>
+
+
                 </div>
 
                 {/* Summary & Pay */}
@@ -757,7 +894,7 @@ export default function POS() {
                                 />
                             </div>
                             <div>
-                                <label className="block text-xs font-bold text-gray-500 mb-1">{t('master.customers.idCardImage')} <span className="text-red-500">*</span></label>
+                                <label className="block text-xs font-bold text-gray-500 mb-1">{t('master.customers.idCardImage' as any)} <span className="text-red-500">*</span></label>
                                 <input
                                     type="file"
                                     required
@@ -805,27 +942,90 @@ export default function POS() {
                         </div>
 
                         <div className="p-4 grid grid-cols-1 gap-3 max-h-[60vh] overflow-y-auto">
-                            {selectionModal.item.variants?.filter((v: any) => (v._count?.instances || 0) > 0).map((variant: any) => (
-                                <button
-                                    key={variant.id}
-                                    onClick={() => addVariantToCart(selectionModal.item, variant)}
-                                    className="flex items-center justify-between p-3 rounded-xl border border-gray-100 hover:border-blue-500 hover:bg-blue-50 transition-all group text-left"
-                                >
-                                    <div className="flex items-center gap-4">
-                                        <div className="w-10 h-10 rounded-full border shadow-sm flex items-center justify-center" style={{ backgroundColor: variant.color?.hexCode }}>
-                                            {!variant.color?.hexCode && <span className="text-[10px]">?</span>}
+                            {selectionModal.item.variants?.map((variant: any) => (
+                                <div key={variant.id} className="border border-gray-100 rounded-xl overflow-hidden transition-all hover:border-blue-200">
+                                    <button
+                                        onClick={() => addVariantToCart(selectionModal.item, variant)}
+                                        className="w-full flex items-center justify-between p-3 bg-white hover:bg-blue-50 transition-colors group text-left"
+                                    >
+                                        <div className="flex items-center gap-4">
+                                            <div className="w-10 h-10 rounded-full border shadow-sm flex items-center justify-center" style={{ backgroundColor: variant.color?.hexCode }}>
+                                                {!variant.color?.hexCode && <span className="text-[10px]">?</span>}
+                                            </div>
+                                            <div>
+                                                <p className="font-bold text-gray-900">{variant.size?.name} - {variant.color?.name}</p>
+                                                <p className="text-xs text-gray-500">Rp {selectionModal.item.rentalPrice.toLocaleString()}</p>
+                                            </div>
                                         </div>
-                                        <div>
-                                            <p className="font-bold text-gray-900">{variant.size?.name} - {variant.color?.name}</p>
-                                            <p className="text-xs text-gray-500">Rp {selectionModal.item.rentalPrice.toLocaleString()}</p>
+                                        <div className="text-right flex items-center gap-3">
+                                            <span className={`text-xs font-bold px-2 py-1 rounded-full ${(variant._count?.instances || 0) > 0
+                                                ? 'bg-green-100 text-green-700'
+                                                : 'bg-orange-100 text-orange-700'
+                                                }`}>
+                                                {variant._count?.instances || 0} / {variant.instances?.length || 0} {t('pos.variant.left')}
+                                            </span>
+
                                         </div>
+                                    </button>
+
+                                    {/* Action Bar */}
+                                    <div className="flex border-t border-gray-100 bg-gray-50/50">
+                                        <button
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                if (viewScheduleId === variant.id) {
+                                                    setViewScheduleId(null);
+                                                } else {
+                                                    setViewScheduleId(variant.id);
+                                                    setLoadingSchedule(true);
+                                                    fetch(`${API_URL}/transactions/schedule/${variant.id}`, {
+                                                        headers: { 'Authorization': `Bearer ${token}` }
+                                                    })
+                                                        .then(res => res.json())
+                                                        .then(data => setScheduleData(data))
+                                                        .catch(err => console.error(err))
+                                                        .finally(() => setLoadingSchedule(false));
+                                                }
+                                            }}
+                                            className="flex-1 py-2 text-xs font-medium text-gray-500 hover:text-blue-600 hover:bg-blue-50 flex items-center justify-center gap-1 transition-colors"
+                                        >
+                                            <Calendar size={14} />
+                                            {viewScheduleId === variant.id ? 'Hide Schedule' : 'Check Schedule'}
+                                            {viewScheduleId === variant.id ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+                                        </button>
                                     </div>
-                                    <div className="text-right">
-                                        <span className="text-xs font-bold bg-green-100 text-green-700 px-2 py-1 rounded-full">
-                                            {variant._count?.instances || 0} {t('pos.variant.left')}
-                                        </span>
-                                    </div>
-                                </button>
+
+                                    {/* Schedule View */}
+                                    {viewScheduleId === variant.id && (
+                                        <div className="bg-gray-50 p-3 border-t border-gray-100 text-xs">
+                                            {loadingSchedule ? (
+                                                <div className="text-center py-2 text-gray-400">Loading schedule...</div>
+                                            ) : scheduleData.length === 0 ? (
+                                                <div className="text-center py-2 text-green-600 font-medium">No active bookings. Fully available.</div>
+                                            ) : (
+                                                <div className="space-y-2">
+                                                    <p className="font-bold text-gray-700 mb-2">Unavailable Dates (Booking + Cleaning):</p>
+                                                    {scheduleData.map((event: any) => (
+                                                        <div key={event.id} className="flex justify-between items-start bg-white p-2 rounded border border-gray-200">
+                                                            <div>
+                                                                <div className="font-medium text-gray-900">
+                                                                    {new Date(event.start).toLocaleDateString()} - {new Date(event.end).toLocaleDateString()}
+                                                                </div>
+                                                                <div className="text-[10px] text-gray-400">
+                                                                    Busy until: <span className="text-red-500">{new Date(event.busyUntil).toLocaleDateString()}</span>
+                                                                </div>
+                                                            </div>
+                                                            <div className="text-right">
+                                                                <div className="font-medium text-blue-900">{event.customer}</div>
+                                                                <div className="text-[10px] text-gray-400 capitalize">{event.status.replace('_', ' ')}</div>
+                                                            </div>
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            )}
+                                        </div>
+                                    )}
+                                </div>
                             ))}
                         </div>
 

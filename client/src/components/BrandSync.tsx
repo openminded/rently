@@ -13,13 +13,19 @@ export default function BrandSync() {
 
         // Update Favicon
         if (logo) {
-            const link: HTMLLinkElement | null = document.querySelector("link[rel*='icon']") || document.createElement('link');
-            link.type = 'image/png';
-            link.rel = 'shortcut icon';
-            link.href = getImageUrl(logo);
-            document.getElementsByTagName('head')[0].appendChild(link);
-        } else {
-            // Revert to default or keep simplified logic
+            const head = document.getElementsByTagName('head')[0];
+            // Find any existing icon link
+            let link = document.querySelector("link[rel*='icon']") as HTMLLinkElement;
+
+            if (!link) {
+                link = document.createElement('link');
+                link.rel = 'shortcut icon';
+                head.appendChild(link);
+            }
+
+            // Force Type and Href
+            link.type = 'image/png'; // Assume PNG for uploaded logos, or extract from url
+            link.href = `${getImageUrl(logo)}?v=${new Date().getTime()}`; // Cache buster
         }
     }, [name, logo]);
 

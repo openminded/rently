@@ -36,7 +36,7 @@ export const logout = async (req: Request, res: Response) => {
 
 export const reconnect = async (req: Request, res: Response) => {
     try {
-        await whatsappService.init();
+        await whatsappService.connect();
         res.json({ success: true });
     } catch (error: any) {
         res.status(500).json({ error: error.message });

@@ -24,6 +24,9 @@ class WhatsAppService {
     public connectionStatus: 'CONNECTED' | 'DISCONNECTED' | 'CONNECTING' | 'QR' = 'DISCONNECTED';
     public qr: string | null = null;
     private authDir = path.join(process.cwd(), 'whatsapp-session');
+    private reconnectAttempts = 0;
+    private readonly MAX_RECONNECT_ATTEMPTS = 5;
+    private retryTimeout: NodeJS.Timeout | null = null;
 
     constructor() {
         if (!fs.existsSync(this.authDir)) {
@@ -31,9 +34,27 @@ class WhatsAppService {
         }
     }
 
-    async init() {
+    async connect() {
+        try {
+            // Clear any pending retry
+            if (this.retryTimeout) {
+                clearTimeout(this.retryTimeout);
+                this.retryTimeout = null;
+            }
+
+            console.log('[WhatsApp] Attempting to connect...');
+            await this.init();
+        } catch (error) {
+            console.error('[WhatsApp] Connection initialization failed:', error);
+            this.handleReconnection();
+        }
+    }
+
+    private async init() {
         const { state, saveCreds } = await useMultiFileAuthState(this.authDir);
         const { version, isLatest } = await fetchLatestBaileysVersion();
+
+        console.log(`[WhatsApp] Using WA v${version.join('.')}, isLatest: ${isLatest}`);
 
         this.sock = makeWASocket({
             version,
@@ -43,7 +64,8 @@ class WhatsAppService {
                 creds: state.creds,
                 keys: makeCacheableSignalKeyStore(state.keys, logger),
             },
-            browser: ['Rumah Dinar', 'Safari', '1.0.0']
+            browser: ['Rumah Dinar', 'Safari', '1.0.0'],
+            generateHighQualityLinkPreview: true,
         });
 
         this.sock.ev.on('connection.update', (update: Partial<ConnectionState>) => {
@@ -56,20 +78,30 @@ class WhatsAppService {
             }
 
             if (connection === 'close') {
-                const shouldReconnect = (lastDisconnect?.error as Boom)?.output?.statusCode !== DisconnectReason.loggedOut;
-                console.log('Connection closed due to ', lastDisconnect?.error, ', reconnecting ', shouldReconnect);
+                const disconnectError = lastDisconnect?.error as Boom;
+                const statusCode = disconnectError?.output?.statusCode;
+
+                const shouldReconnect = statusCode !== DisconnectReason.loggedOut;
+
+                console.log('[WhatsApp] Connection closed:', {
+                    statusCode,
+                    error: disconnectError?.message,
+                    shouldReconnect
+                });
+
                 this.connectionStatus = 'DISCONNECTED';
 
-                // Prevent immediate tight loops
                 if (shouldReconnect) {
-                    setTimeout(() => {
-                        this.init();
-                    }, 3000); // Wait 3 seconds before reconnecting
+                    this.handleReconnection();
+                } else {
+                    console.log('[WhatsApp] Logged out. Waiting for manual reconnection.');
+                    this.logout().catch(err => console.error('Error during logout cleanup:', err));
                 }
             } else if (connection === 'open') {
-                console.log('Opened connection');
+                console.log('[WhatsApp] Opened connection');
                 this.connectionStatus = 'CONNECTED';
                 this.qr = null;
+                this.reconnectAttempts = 0;
             } else if (connection === 'connecting') {
                 this.connectionStatus = 'CONNECTING';
             }
@@ -78,6 +110,22 @@ class WhatsAppService {
         this.sock.ev.on('creds.update', saveCreds);
 
         return this.sock;
+    }
+
+    private handleReconnection() {
+        if (this.reconnectAttempts >= this.MAX_RECONNECT_ATTEMPTS) {
+            console.error(`[WhatsApp] Max reconnection attempts (${this.MAX_RECONNECT_ATTEMPTS}) reached. Stopping retries.`);
+            return;
+        }
+
+        const delay = Math.min(1000 * Math.pow(2, this.reconnectAttempts), 30000); // Backoff: 1s, 2s, 4s, ..., max 30s
+        console.log(`[WhatsApp] Reconnecting in ${delay}ms (Attempt ${this.reconnectAttempts + 1}/${this.MAX_RECONNECT_ATTEMPTS})...`);
+
+        this.reconnectAttempts++;
+
+        this.retryTimeout = setTimeout(() => {
+            this.connect();
+        }, delay);
     }
 
     async sendMessage(to: string, text: string) {
@@ -106,15 +154,38 @@ class WhatsAppService {
     }
 
     async logout() {
+        // Clear any pending retry
+        if (this.retryTimeout) {
+            clearTimeout(this.retryTimeout);
+            this.retryTimeout = null;
+        }
+
         if (this.sock) {
-            await this.sock.logout();
+            try {
+                await this.sock.logout();
+            } catch (err) {
+                console.warn('[WhatsApp] Error sending logout command:', err);
+            }
+            this.sock.end(undefined);
+            this.sock = null;
         }
+
         if (fs.existsSync(this.authDir)) {
-            fs.rmSync(this.authDir, { recursive: true, force: true });
+            try {
+                fs.rmSync(this.authDir, { recursive: true, force: true });
+            } catch (err) {
+                console.error('[WhatsApp] Failed to remove auth directory:', err);
+            }
         }
+
         this.connectionStatus = 'DISCONNECTED';
         this.qr = null;
-        await this.init();
+        this.reconnectAttempts = 0;
+
+        // Re-initialize to get a fresh start for new QR
+        console.log('[WhatsApp] Logout complete. Re-initializing for new session...');
+        // We delay slightly to ensure clean cleanup
+        setTimeout(() => this.connect(), 1000);
     }
 }
 
