@@ -33,6 +33,8 @@ import { masterController } from '../controllers/masterController.js';
 router.get('/public/items', inventoryController.getItems);
 router.get('/public/categories', masterController.categories.getAll);
 
+
+
 // Protect all API routes below
 router.use(authenticateToken);
 

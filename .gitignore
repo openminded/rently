@@ -7,3 +7,6 @@ coverage
 build
 .husky
 *.log
+server/whatsapp-session
+whatsapp-session
+server/dist

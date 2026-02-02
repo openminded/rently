@@ -27,12 +27,14 @@ import Settings from './pages/settings/Settings';
 import AppConfig from './pages/settings/AppConfig';
 import Broadcast from './pages/Broadcast';
 import Finance from './pages/Finance';
+import BrandSync from './components/BrandSync';
 
 function App() {
   return (
     <LanguageProvider>
       <BrowserRouter>
         <AuthProvider>
+          <BrandSync />
           <Routes>
             {/* Invoice Route - Independent Layout for Printing */}
             <Route path="/invoice/:id" element={<Invoice />} />

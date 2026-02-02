@@ -338,7 +338,8 @@ export default function POS() {
                 setCart([]);
                 setCustomer(null);
                 setAmountPaid(0);
-                // Refresh items to update stock
+
+                // Refresh items
                 const itemsRes = await fetch(`${API_URL}/items?page=1&limit=20&search=${searchQuery}`, {
                     headers: { 'Authorization': `Bearer ${token}` }
                 });
@@ -347,7 +348,7 @@ export default function POS() {
                 setHasMore(itemsData.hasMore);
                 setPage(1);
 
-                // Open Invoice
+                // Open Invoice (Always open invoice)
                 const txData = await res.json();
                 window.open(`/invoice/${txData.transactionId || txData.id}`, '_blank');
             } else {
@@ -756,11 +757,11 @@ export default function POS() {
                                 />
                             </div>
                             <div>
-                                <label className="block text-xs font-bold text-gray-500 mb-1">{t('common.actions')} <span className="text-red-500">*</span></label>
+                                <label className="block text-xs font-bold text-gray-500 mb-1">{t('master.customers.idCardImage')} <span className="text-red-500">*</span></label>
                                 <input
                                     type="file"
-                                    accept="image/*"
                                     required
+                                    accept="image/*"
                                     className="w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"
                                     onChange={e => {
                                         if (e.target.files && e.target.files[0]) {
