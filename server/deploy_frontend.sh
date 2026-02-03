@@ -21,14 +21,11 @@ npm install
 echo "🔨 Building Frontend..."
 npm run build
 
-# 5. Move Build Files to Web Root
-# Asumsi web root adalah folder induk dari folder 'client' dan 'server'
-WEB_ROOT="/www/wwwroot/werently.telaju.com"
-
-echo "📂 Moving build files to $WEB_ROOT..."
-# Hapus file lama di root (hati-hati jangan hapus folder server)
-# Kita gunakan rsync atau copy yang aman
-cp -r dist/* $WEB_ROOT/
+# 5. Build Result Verification
+# Nginx is currently configured to look in: /www/wwwroot/werently.telaju.com/client/dist
+# The build folder is already there after 'npm run build'.
 
 echo "✅ Frontend Deployment Complete!"
-echo "⚠️  IMPORTANT: Please configure Nginx in AA Panel to serve these files and proxy /api to port 3000."
+echo "🌐 URL: https://werently.telaju.com"
+echo "⚠️  IMPORTANT: In AA Panel, ensure your Website 'Site Directory' or Nginx 'root' is set to:"
+echo "   /www/wwwroot/werently.telaju.com/client/dist"

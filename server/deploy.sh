@@ -15,9 +15,11 @@ git reset --hard origin/main
 echo "📦 Installing dependencies..."
 npm ci
 
-# 3. Build the project
-echo "🔨 Building project..."
+# 3. Build and Sync Database
+echo "🔨 Building project & syncing database..."
 npm run build
+npx prisma generate
+npx prisma db push --accept-data-loss
 
 # 4. Restart Application
 echo "🔄 Restarting application..."
