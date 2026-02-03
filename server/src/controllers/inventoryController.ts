@@ -115,97 +115,75 @@ export const inventoryController = {
 
 
 
-            // Date Range Filtering Prep
-            const startDateStr = req.query.startDate as string;
-            const endDateStr = req.query.endDate as string;
+            // 1. Date Range Filtering Prep (Default to Today if missing)
+            let startDateStr = (req.query.startDate as string) || '';
+            let endDateStr = (req.query.endDate as string) || '';
+
+            if (!startDateStr || !endDateStr) {
+                const today = new Date();
+                const todayStr = today.toISOString().split('T')[0] || '';
+                startDateStr = todayStr;
+                endDateStr = todayStr;
+            }
 
             let excludedSkus: string[] = [];
 
-            if (startDateStr && endDateStr) {
-                // Fetch Settings for Laundry Rule (Reuse logic or fetch fresh)
-                const settings = await prisma.appSetting.findMany({
-                    where: { key: { in: ['ENABLE_MAX_LAUNDRY_DAY', 'MAX_LAUNDRY_DAYS'] } }
-                });
-                const enableLaundryRule = settings.find(s => s.key === 'ENABLE_MAX_LAUNDRY_DAY')?.value === 'true';
-                const laundryDays = parseInt(settings.find(s => s.key === 'MAX_LAUNDRY_DAYS')?.value || '0');
-                const reqBuffer = enableLaundryRule ? laundryDays : 0;
+            // 2. Fetch Settings for Laundry Overlap Rule
+            const settings = await prisma.appSetting.findMany({
+                where: { key: { in: ['ENABLE_MAX_LAUNDRY_DAY', 'MAX_LAUNDRY_DAYS'] } }
+            });
+            const enableLaundryRule = settings.find(s => s.key === 'ENABLE_MAX_LAUNDRY_DAY')?.value === 'true';
+            const laundryDays = parseInt(settings.find(s => s.key === 'MAX_LAUNDRY_DAYS')?.value || '0');
+            const reqBuffer = enableLaundryRule ? laundryDays : 0;
 
-                const reqStart = new Date(startDateStr);
-                const reqEnd = new Date(endDateStr);
-                reqStart.setHours(0, 0, 0, 0);
-                reqEnd.setHours(0, 0, 0, 0);
+            const reqStart = new Date(startDateStr);
+            const reqEnd = new Date(endDateStr);
+            reqStart.setHours(0, 0, 0, 0);
+            reqEnd.setHours(0, 0, 0, 0);
 
-                // Find all conflicting transactions
-                // We need to find transactions where:
-                // (reqStart <= txEnd + buffer) AND (reqEnd >= txStart)
-                // Note: We can't easily do the dynamic buffer math in a pure Prisma where clause for all DBs efficiently without raw query.
-                // But for "Standard" overlap: (StartA <= EndB) and (EndA >= StartB)
-                // With buffer, "Existing Transaction" occupies [txStart, txEnd + buffer].
+            // 3. Find all conflicting transactions (Smart Overlap Logic)
+            const activeTransactions = await prisma.transaction.findMany({
+                where: {
+                    status: { in: ['BOOKED', 'WAITING_PICKUP', 'RENTED'] },
+                },
+                include: { items: true }
+            });
 
-                // Let's fetch active transactions and filter in JS if dataset isn't huge, 
-                // OR use a broader date filter in DB then refine.
-                // Broader DB Filter: Overlap with [reqStart, reqEnd] (ignoring buffer for a moment to reduce set)
+            activeTransactions.forEach(tx => {
+                const txStart = new Date(tx.pickupDate);
+                const txEnd = new Date(tx.returnPlanDate);
+                txStart.setHours(0, 0, 0, 0);
+                txEnd.setHours(0, 0, 0, 0);
 
-                const activeTransactions = await prisma.transaction.findMany({
-                    where: {
-                        status: { in: ['BOOKED', 'WAITING_PICKUP', 'RENTED'] },
-                        // Optimization: overlap check
-                        // tx.pickupDate <= reqEnd AND tx.returnPlanDate + buffer >= reqStart
-                        // We can't easily do `returnPlanDate + buffer` in where.
-                        // So we fetch active ones roughly in range or open-ended.
-                        // Actually, just fetching all active future/current transactions might be safer and filter in memory?
-                        // Or just fetch ALL active transactions.
-                    },
-                    include: { items: true }
-                });
+                const txEffectiveEnd = new Date(txEnd);
+                txEffectiveEnd.setDate(txEffectiveEnd.getDate() + reqBuffer);
+                const overlap1 = (reqStart <= txEffectiveEnd) && (reqEnd >= txStart);
 
-                // Filter collisions
-                activeTransactions.forEach(tx => {
-                    const txStart = new Date(tx.pickupDate);
-                    const txEnd = new Date(tx.returnPlanDate);
-                    txStart.setHours(0, 0, 0, 0);
-                    txEnd.setHours(0, 0, 0, 0);
+                const reqEffectiveEnd = new Date(reqEnd);
+                reqEffectiveEnd.setDate(reqEffectiveEnd.getDate() + reqBuffer);
+                const overlap2 = (txStart <= reqEffectiveEnd) && (txEnd >= reqStart);
 
-                    // Check 1: New Req overlaps Existing [Start, End + Buffer]
-                    const txEffectiveEnd = new Date(txEnd);
-                    txEffectiveEnd.setDate(txEffectiveEnd.getDate() + reqBuffer);
-                    const overlap1 = (reqStart <= txEffectiveEnd) && (reqEnd >= txStart);
-
-                    // Check 2: Existing overlaps New Req [Start, End + Buffer]
-                    const reqEffectiveEnd = new Date(reqEnd);
-                    reqEffectiveEnd.setDate(reqEffectiveEnd.getDate() + reqBuffer);
-                    const overlap2 = (txStart <= reqEffectiveEnd) && (txEnd >= reqStart);
-
-                    if (overlap1 || overlap2) {
-                        tx.items.forEach(ti => {
-                            if (ti.itemInstanceSku) excludedSkus.push(ti.itemInstanceSku);
-                        });
-                    }
-                });
-            }
+                if (overlap1 || overlap2) {
+                    tx.items.forEach(ti => {
+                        if (ti.itemInstanceSku) excludedSkus.push(ti.itemInstanceSku);
+                    });
+                }
+            });
 
             const where: any = {};
 
-            // Apply Excluded SKUs filter
-            if (startDateStr && endDateStr) {
-                // We want items that have AT LEAST ONE instance NOT in the excluded list
-                // AND that instance must be "AVAILABLE" (or RENTED but not colliding - strictly "Status" based?
-                // Actually, if we exclude colliding SKUs, we just need to ensure the item has *other* instances or *non-colliding* instances.
-                // But `excludedSkus` contains the colliding ones.
-                // An Item is available if `variants` has some `instances` with `sku` NOT IN `excludedSkus`.
-
-                where.variants = {
-                    some: {
-                        instances: {
-                            some: {
-                                sku: { notIn: excludedSkus },
-                                // Also must be logically available (not damaged/lost)
-                                status: { in: ['AVAILABLE', 'RENTED'] }
-                            }
+            // 4. Base Availability Filter
+            // An Item is "Available" if at least one instance is NOT in excludedSkus AND status is AVAILABLE
+            where.variants = {
+                some: {
+                    instances: {
+                        some: {
+                            sku: { notIn: excludedSkus },
+                            status: ItemStatus.AVAILABLE
                         }
                     }
-                };
-            }
+                }
+            };
 
             if (search) {
                 where.OR = [
@@ -239,10 +217,8 @@ export const inventoryController = {
                         _count: {
                             select: {
                                 instances: {
-                                    where: (startDateStr && endDateStr) ? {
+                                    where: {
                                         sku: { notIn: excludedSkus },
-                                        status: { in: [ItemStatus.AVAILABLE, ItemStatus.RENTED, ItemStatus.IN_LAUNDRY] }
-                                    } : {
                                         status: ItemStatus.AVAILABLE
                                     }
                                 }
@@ -273,7 +249,17 @@ export const inventoryController = {
                     include,
                     orderBy: { createdAt: 'desc' }
                 });
-                return res.json(items);
+
+                // Add aggregate status
+                const itemsWithStatus = (items as any[]).map(item => {
+                    const totalAvailable = item.variants.reduce((sum: number, v: any) => sum + (v._count?.instances || 0), 0);
+                    return {
+                        ...item,
+                        status: totalAvailable > 0 ? ItemStatus.AVAILABLE : ItemStatus.RENTED
+                    };
+                });
+
+                return res.json(itemsWithStatus);
             }
 
             const [items, total] = await Promise.all([
@@ -287,8 +273,17 @@ export const inventoryController = {
                 prisma.item.count({ where })
             ]);
 
+            // Add aggregate status to paginated results
+            const itemsWithStatus = (items as any[]).map(item => {
+                const totalAvailable = item.variants.reduce((sum: number, v: any) => sum + (v._count?.instances || 0), 0);
+                return {
+                    ...item,
+                    status: totalAvailable > 0 ? ItemStatus.AVAILABLE : ItemStatus.RENTED
+                };
+            });
+
             res.json({
-                items,
+                items: itemsWithStatus,
                 total,
                 page,
                 limit,
@@ -397,7 +392,7 @@ export const inventoryController = {
         try {
             const { sku } = req.params;
             const instance = await prisma.itemInstance.findUnique({
-                where: { sku },
+                where: { sku: sku as string },
                 include: {
                     itemVariant: {
                         include: {
@@ -501,4 +496,99 @@ export const inventoryController = {
             res.status(500).json({ error: 'Failed to fetch history' });
         }
     },
+
+    getVariantAvailability: async (req: Request, res: Response) => {
+        try {
+            const { variantId } = req.params;
+            const { startDate, endDate } = req.query;
+
+            if (!startDate || !endDate) {
+                return res.status(400).json({ error: 'startDate and endDate are required' });
+            }
+
+            const reqStart = new Date(startDate as string);
+            const reqEnd = new Date(endDate as string);
+            reqStart.setHours(0, 0, 0, 0);
+            reqEnd.setHours(0, 0, 0, 0);
+
+            // Fetch Settings for Laundry Overlap Rule
+            const settings = await prisma.appSetting.findMany({
+                where: { key: { in: ['ENABLE_MAX_LAUNDRY_DAY', 'MAX_LAUNDRY_DAYS'] } }
+            });
+            const enableLaundryRule = settings.find(s => s.key === 'ENABLE_MAX_LAUNDRY_DAY')?.value === 'true';
+            const laundryDays = parseInt(settings.find(s => s.key === 'MAX_LAUNDRY_DAYS')?.value || '0');
+            const reqBuffer = enableLaundryRule ? laundryDays : 0;
+
+            // Fetch all instances of this variant
+            const instances = await prisma.itemInstance.findMany({
+                where: { itemVariantId: Number(variantId) },
+                select: { sku: true, status: true }
+            });
+
+            const skus = instances.map(i => i.sku);
+
+            // Fetch transactions involving these SKUs that overlap with the requested range
+            const transactions = await prisma.transaction.findMany({
+                where: {
+                    status: { in: ['BOOKED', 'WAITING_PICKUP', 'RENTED'] },
+                    items: {
+                        some: {
+                            itemInstanceSku: { in: skus }
+                        }
+                    }
+                },
+                include: { items: true }
+            });
+
+            const availabilityMap: { [date: string]: boolean } = {};
+
+            // Iterate over each day in the range
+            const current = new Date(reqStart);
+            while (current <= reqEnd) {
+                const dateKey = current.toISOString().split('T')[0] || '';
+                const dayStart = new Date(current);
+                const dayEnd = new Date(current);
+                dayStart.setHours(0, 0, 0, 0);
+                dayEnd.setHours(23, 59, 59, 999);
+
+                // For this specific day, find occupied SKUs
+                const occupiedSkus = new Set<string>();
+
+                transactions.forEach(tx => {
+                    const txStart = new Date(tx.pickupDate);
+                    const txEnd = new Date(tx.returnPlanDate);
+                    txStart.setHours(0, 0, 0, 0);
+                    txEnd.setHours(0, 0, 0, 0);
+
+                    const txEffectiveEnd = new Date(txEnd);
+                    txEffectiveEnd.setDate(txEffectiveEnd.getDate() + reqBuffer);
+
+                    // Check if transaction (plus buffer) overlaps with this specific "day"
+                    const overlap = (dayStart <= txEffectiveEnd) && (dayEnd >= txStart);
+
+                    if (overlap) {
+                        tx.items.forEach(ti => {
+                            if (ti.itemInstanceSku && skus.includes(ti.itemInstanceSku)) {
+                                occupiedSkus.add(ti.itemInstanceSku);
+                            }
+                        });
+                    }
+                });
+
+                // Check if any instance is available (status is AVAILABLE AND not occupied)
+                const availableInstance = instances.find(inst =>
+                    inst.status === 'AVAILABLE' && !occupiedSkus.has(inst.sku)
+                );
+
+                availabilityMap[dateKey] = !!availableInstance;
+
+                current.setDate(current.getDate() + 1);
+            }
+
+            res.json(availabilityMap);
+        } catch (error) {
+            console.error("Fetch variant availability error:", error);
+            res.status(500).json({ error: 'Failed to fetch availability' });
+        }
+    }
 };

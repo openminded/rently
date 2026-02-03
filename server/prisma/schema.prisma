@@ -36,6 +36,7 @@ model Customer {
   id                  Int           @id @default(autoincrement())
   name                String
   phone               String        @unique
+  email               String?       // Will be filled for all new customers
   address             String?
   identityCardNumber  String?       @unique // KTP
   identityCardImage   String?       // URL/Path to KTP Image
@@ -147,9 +148,15 @@ enum PaymentStatus {
   PAID
 }
 
+enum TransactionSource {
+  OFFLINE
+  ONLINE
+}
+
 model Transaction {
   id               Int               @id @default(autoincrement())
   type             TransactionType   @default(BOOKING)
+  source           TransactionSource @default(OFFLINE)
   customerId       Int
   customer         Customer          @relation(fields: [customerId], references: [id])
   userId           Int?
@@ -205,10 +212,17 @@ model TransactionItem {
   priceAtRental Float
 }
 
+enum PaymentMethodType {
+  CASH
+  TRANSFER
+  GATEWAY
+}
+
 model PaymentMethod {
-  id       Int       @id @default(autoincrement())
-  name     String    @unique // e.g., Transfer BCA, Cash
-  account  String?   // Rekening number
+  id       Int               @id @default(autoincrement())
+  name     String            @unique // e.g., Transfer BCA, Cash
+  type     PaymentMethodType @default(CASH)
+  account  String?           // Rekening number
   payments Payment[]
 }
 

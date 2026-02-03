@@ -11,8 +11,9 @@ const API_BASE = `${API_BASE_URL}/masters`;
 interface Field {
     name: string;
     label: string;
-    type?: string; // text, number, color
+    type?: string; // text, number, color, select
     required?: boolean;
+    options?: { value: string; label: string }[];
 }
 
 interface MasterGenericProps {
@@ -250,6 +251,18 @@ export default function MasterGenericPage({ title, description, endpoint, column
                                             className="w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"
                                             required={f.required && !currentItem} // Required only on create
                                         />
+                                    ) : f.type === 'select' ? (
+                                        <select
+                                            name={f.name}
+                                            defaultValue={currentItem ? currentItem[f.name] : ''}
+                                            className="w-full p-2 border border-gray-300 rounded-lg outline-none focus:border-blue-500"
+                                            required={f.required}
+                                        >
+                                            <option value="" disabled>{t('common.select' as any)}</option>
+                                            {f.options?.map(opt => (
+                                                <option key={opt.value} value={opt.value}>{opt.label}</option>
+                                            ))}
+                                        </select>
                                     ) : (
                                         <input
                                             name={f.name}

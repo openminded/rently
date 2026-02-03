@@ -1,7 +1,138 @@
 import type { Request, Response } from 'express';
 import prisma from '../prisma.js';
+import { duitkuService } from '../services/duitkuService.js';
 
 export const transactionController = {
+    // Online Booking from Landing Page
+    publicBook: async (req: Request, res: Response) => {
+        try {
+            const { name, phone, email, pickupDate, returnPlanDate, items } = req.body;
+
+            // 1. Validation
+            if (!name || !phone || !email || !pickupDate || !returnPlanDate || !items || items.length === 0) {
+                return res.status(400).json({ error: 'Missing required fields (name, phone, email, etc.)' });
+            }
+
+            // 2. Customer Handling (Find or Create)
+            let customer = await prisma.customer.findUnique({ where: { phone } });
+            if (!customer) {
+                customer = await prisma.customer.create({
+                    data: { name, phone, email }
+                });
+            } else if (!customer.email) {
+                // Update email if previously empty
+                customer = await prisma.customer.update({
+                    where: { id: customer.id },
+                    data: { email }
+                });
+            }
+
+            // 3. Logic to check and assign items (similar to createConfig but for online)
+            const assignedSkus: string[] = [];
+            const quantityRequests = items.filter((i: any) => i.variantId && i.quantity > 0);
+
+            // Fetch Settings
+            const setRes = await prisma.appSetting.findMany({
+                where: { key: { in: ['ENABLE_MAX_LAUNDRY_DAY', 'MAX_LAUNDRY_DAYS'] } }
+            });
+            const enableLaundryRule = setRes.find(s => s.key === 'ENABLE_MAX_LAUNDRY_DAY')?.value === 'true';
+            const laundryDays = parseInt(setRes.find(s => s.key === 'MAX_LAUNDRY_DAYS')?.value || '0');
+
+            const reqStart = new Date(pickupDate);
+            const reqEnd = new Date(returnPlanDate);
+            reqStart.setHours(0, 0, 0, 0);
+            reqEnd.setHours(0, 0, 0, 0);
+            const reqBuffer = enableLaundryRule ? laundryDays : 0;
+
+            for (const reqItem of quantityRequests) {
+                const availableInstances = await prisma.itemInstance.findMany({
+                    where: { itemVariantId: reqItem.variantId },
+                    include: {
+                        transactionItems: {
+                            where: { transaction: { status: { in: ['BOOKED', 'WAITING_PICKUP', 'RENTED'] } } },
+                            include: { transaction: true }
+                        }
+                    }
+                });
+
+                const validInstances = availableInstances.filter(instance => {
+                    return !instance.transactionItems.some(ti => {
+                        const tx = ti.transaction;
+                        const txStart = new Date(tx.pickupDate);
+                        const txEnd = new Date(tx.returnPlanDate);
+                        txStart.setHours(0, 0, 0, 0);
+                        txEnd.setHours(0, 0, 0, 0);
+                        const txEffEnd = new Date(txEnd); txEffEnd.setDate(txEffEnd.getDate() + reqBuffer);
+                        const overlap1 = (reqStart <= txEffEnd) && (reqEnd >= txStart);
+                        const reqEffEnd = new Date(reqEnd); reqEffEnd.setDate(reqEffEnd.getDate() + reqBuffer);
+                        const overlap2 = (txStart <= reqEffEnd) && (txEnd >= reqStart);
+                        return overlap1 || overlap2;
+                    });
+                });
+
+                if (validInstances.length < reqItem.quantity) {
+                    return res.status(400).json({ error: `Not enough availability for one or more items.` });
+                }
+                assignedSkus.push(...validInstances.slice(0, reqItem.quantity).map(i => i.sku));
+            }
+
+            // 4. Create Transaction
+            const result = await prisma.$transaction(async (tx) => {
+                let totalAmount = 0;
+                const txItems = [];
+
+                for (const sku of assignedSkus) {
+                    const inst = await tx.itemInstance.findUnique({
+                        where: { sku },
+                        include: { itemVariant: { include: { item: true } } }
+                    });
+                    if (!inst) throw new Error(`SKU ${sku} not found`);
+                    totalAmount += inst.itemVariant.item.rentalPrice;
+                    txItems.push({ itemInstanceSku: sku, priceAtRental: inst.itemVariant.item.rentalPrice });
+                }
+
+                const transaction = await (tx.transaction as any).create({
+                    data: {
+                        customerId: customer.id,
+                        pickupDate: reqStart,
+                        returnPlanDate: reqEnd,
+                        totalAmount,
+                        status: 'BOOKED',
+                        paymentStatus: 'UNPAID',
+                        source: 'ONLINE',
+                        items: { create: txItems }
+                    }
+                });
+
+                return transaction;
+            });
+
+            // 5. Generate Duitku QRIS (Mandatory for Online)
+            const duitkuResp = await (duitkuService as any).createQRIS(
+                result.id.toString() + '-BOOKING',
+                result.totalAmount,
+                `Online Booking #${result.id} - ${customer.name}`,
+                {
+                    name: customer.name,
+                    phone: customer.phone,
+                    email: email
+                }
+            );
+
+            res.json({
+                success: true,
+                transactionId: result.id,
+                qrString: duitkuResp.qrString,
+                paymentUrl: duitkuResp.paymentUrl,
+                amount: result.totalAmount
+            });
+
+        } catch (error: any) {
+            console.error('Online Booking Error:', error);
+            res.status(500).json({ error: error.message || 'Failed to process online booking' });
+        }
+    },
+
     // Create a new rental transaction
     createConfig: async (req: Request, res: Response) => {
         // Updated logic for Booking vs Immediate
@@ -163,23 +294,55 @@ export const transactionController = {
 
                 // Payment Handling
                 if (payment) {
-                    await tx.payment.create({
-                        data: {
-                            transactionId: newTransaction.id,
-                            amount: payment.amount,
-                            paymentMethodId: payment.methodId,
-                            createdById: req.user?.id ?? null
-                        }
+                    const paymentMethod = await tx.paymentMethod.findUnique({
+                        where: { id: payment.methodId }
                     });
 
-                    // Update Paid Amount
-                    await tx.transaction.update({
-                        where: { id: newTransaction.id },
-                        data: {
-                            paidAmount: payment.amount,
-                            paymentStatus: payment.amount >= (totalAmount + finalAdminFee + taxAmount) ? 'PAID' : 'PARTIAL' // Update logic as needed
+                    // If it is GATEWAY (Duitku), we generate Duitku Invoice but do NOT mark as paid yet.
+                    if (paymentMethod?.type === 'GATEWAY') {
+                        const customer = await tx.customer.findUnique({ where: { id: customerId } });
+                        const productDetails = `Rental Transaction #${newTransaction.id}`;
+
+                        try {
+                            const duitkuResp = await duitkuService.createQRIS(
+                                newTransaction.id.toString() + '-BOOKING',
+                                payment.amount,
+                                productDetails,
+                                {
+                                    name: customer?.name || 'Customer',
+                                    email: 'customer@rently.com', // Default if not available
+                                    phone: customer?.phone || ''
+                                }
+                            );
+
+                            // We attach the payment URL to the response so frontend can show it
+                            (newTransaction as any).paymentUrl = duitkuResp.paymentUrl;
+                            (newTransaction as any).qrString = duitkuResp.qrString;
+                        } catch (err: any) {
+                            console.error('Duitku QRIS Generation Failed:', err);
+                            // We still return the transaction but without payment info
+                            (newTransaction as any).paymentError = 'Failed to generate QRIS';
                         }
-                    });
+                    } else {
+                        // Regular Manual Payment (Cash/Transfer)
+                        await tx.payment.create({
+                            data: {
+                                transactionId: newTransaction.id,
+                                amount: payment.amount,
+                                paymentMethodId: payment.methodId,
+                                createdById: req.user?.id ?? null
+                            }
+                        });
+
+                        // Update Paid Amount
+                        await tx.transaction.update({
+                            where: { id: newTransaction.id },
+                            data: {
+                                paidAmount: payment.amount,
+                                paymentStatus: payment.amount >= (totalAmount + finalAdminFee + taxAmount) ? 'PAID' : 'PARTIAL'
+                            }
+                        });
+                    }
                 }
 
                 return newTransaction;
@@ -218,28 +381,55 @@ export const transactionController = {
             if (!transaction) return res.status(404).json({ error: 'Transaction not found' });
             if (transaction.status !== 'BOOKED') return res.status(400).json({ error: 'Transaction Status must be BOOKED to add payment here.' });
 
-            await prisma.$transaction(async (tx) => {
+            const result = await prisma.$transaction(async (tx) => {
+                const paymentMethod = await tx.paymentMethod.findUnique({
+                    where: { id: payment.methodId }
+                });
+
+                // If GATEWAY (Duitku)
+                if (paymentMethod?.type === 'GATEWAY') {
+                    const customer = await tx.customer.findUnique({ where: { id: transaction.customerId } });
+                    const productDetails = `Payment for Transaction #${transaction.id}`;
+
+                    try {
+                        const amount = parseFloat(payment.amount);
+                        const duitkuResp = await duitkuService.createQRIS(
+                            transaction.id.toString() + '-PAY',
+                            amount,
+                            productDetails,
+                            {
+                                name: customer?.name || 'Customer',
+                                email: 'customer@rently.com',
+                                phone: customer?.phone || ''
+                            }
+                        );
+
+                        return {
+                            success: true,
+                            paymentUrl: duitkuResp.paymentUrl,
+                            qrString: duitkuResp.qrString,
+                            transactionId: transaction.id
+                        };
+                    } catch (err) {
+                        console.error('Duitku payment failed:', err);
+                        throw new Error('Failed to generate Duitku QRIS');
+                    }
+                }
+
+                // Regular manual payment
                 await tx.payment.create({
                     data: {
                         transactionId: transaction.id,
                         amount: parseFloat(payment.amount),
                         paymentMethodId: payment.methodId,
                         note: payment.note || 'Manual Payment',
-                        createdById: req.user?.id ?? null // Track who took the payment
+                        createdById: req.user?.id ?? null
                     }
                 });
 
                 const newPaidAmount = transaction.paidAmount + parseFloat(payment.amount);
                 let newPaymentStatus = 'PARTIAL';
                 if (newPaidAmount >= transaction.totalAmount) newPaymentStatus = 'PAID';
-
-                // If paid something (even Partial), we consider it "Confirmed" -> WAITING_PICKUP?
-                // Or user logic "unpaid tidak bisa di mark waitin pickup" implies if we pay, it CAN be marked.
-                // Let's set status to BOOKED still? OR WAITING_PICKUP?
-                // User said: "jika sudah lunas dia akan otomatis ada di waiting pickup". 
-                // Implicitly, Paying DP *confirms* it. I will keep it as BOOKED but filter logic will move it.
-                // Wait, if I keep it BOOKED, I need to adjust filter.
-                // Let's keep status BOOKED. Filter will handle appearance.
 
                 await tx.transaction.update({
                     where: { id: transaction.id },
@@ -248,9 +438,11 @@ export const transactionController = {
                         paymentStatus: newPaymentStatus as any
                     }
                 });
+
+                return { success: true, message: 'Payment added' };
             });
 
-            res.json({ message: 'Payment added' });
+            res.json(result);
         } catch (error) {
             console.error(error);
             res.status(500).json({ error: 'Failed to add payment' });
@@ -286,9 +478,45 @@ export const transactionController = {
                 });
             }
 
-            await prisma.$transaction(async (tx) => {
+            const result = await prisma.$transaction(async (tx) => {
                 // 1. Record Payment if any
                 if (payment) {
+                    const paymentMethod = await tx.paymentMethod.findUnique({
+                        where: { id: payment.methodId }
+                    });
+
+                    // If it is GATEWAY (Duitku), we generate QRIS but don't finalize transaction yet
+                    if (paymentMethod?.type === 'GATEWAY') {
+                        const customer = await tx.customer.findUnique({ where: { id: transaction.customerId } });
+                        const productDetails = `Pickup Payment for Transaction #${transaction.id}`;
+
+                        try {
+                            const amount = parseFloat(payment.amount);
+                            const duitkuResp = await duitkuService.createQRIS(
+                                transaction.id.toString() + '-PICKUP',
+                                amount,
+                                productDetails,
+                                {
+                                    name: customer?.name || 'Customer',
+                                    email: 'customer@rently.com',
+                                    phone: customer?.phone || ''
+                                }
+                            );
+
+                            return {
+                                success: true,
+                                paymentUrl: duitkuResp.paymentUrl,
+                                qrString: duitkuResp.qrString,
+                                transactionId: transaction.id,
+                                suffix: 'PICKUP'
+                            };
+                        } catch (err) {
+                            console.error('Duitku pickup payment failed:', err);
+                            throw new Error('Failed to generate Duitku QRIS for pickup');
+                        }
+                    }
+
+                    // Regular manual payment
                     await tx.payment.create({
                         data: {
                             transactionId: transaction.id,
@@ -299,28 +527,30 @@ export const transactionController = {
                     });
                 }
 
-                // 2. Update Transaction
+                // 2. Update Transaction (Standard logic for manual payment or no payment)
                 await tx.transaction.update({
                     where: { id: transaction.id },
                     data: {
                         status: 'RENTED',
                         paidAmount: currentPaid,
                         paymentStatus: 'PAID',
-                        pickupDate: new Date(), // Actual pickup time
-                        pickedUpById: req.user?.id ?? null // Track who processed the pickup
+                        pickupDate: new Date(),
+                        pickedUpById: req.user?.id ?? null
                     }
                 });
 
-                // 3. Update Items to RENTED (if not already, though booking should create reserved instances)
+                // 3. Update Instances
                 for (const item of transaction.items) {
                     await tx.itemInstance.update({
                         where: { sku: item.itemInstanceSku },
                         data: { status: 'RENTED' }
                     });
                 }
+
+                return { success: true, message: 'Pickup successful' };
             });
 
-            res.json({ message: 'Pickup successful' });
+            res.json(result);
         } catch (error) {
             console.error(error);
             res.status(500).json({ error: 'Pickup failed' });
@@ -347,8 +577,65 @@ export const transactionController = {
             // Collect SKUs for laundry log creation (outside transaction)
             const laundrySkus: string[] = [];
 
+            // 1. Check for Payment Method early if it is GATEWAY
+            const { payment } = req.body;
+            if (payment && payment.amount > 0) {
+                const paymentMethod = await prisma.paymentMethod.findUnique({
+                    where: { id: payment.methodId }
+                });
+
+                if (paymentMethod?.type === 'GATEWAY') {
+                    console.log('[Return] Gateway payment detected. Handling separate from main transaction.');
+
+                    // Create Fines First (so they are recorded regardless of payment success)
+                    if (fines && fines.length > 0) {
+                        await prisma.$transaction(async (tx) => {
+                            for (const fine of fines) {
+                                await tx.fine.create({
+                                    data: {
+                                        transactionId: transaction.id,
+                                        violationTypeId: fine.violationTypeId,
+                                        amount: fine.amount,
+                                        note: fine.note
+                                    }
+                                });
+                            }
+                        });
+                    }
+
+                    const customer = await prisma.customer.findUnique({ where: { id: transaction.customerId } });
+                    const productDetails = `Return Payment for Transaction #${transaction.id}`;
+
+                    try {
+                        const amount = parseFloat(payment.amount);
+                        const duitkuResp = await duitkuService.createQRIS(
+                            transaction.id.toString() + '-RETURN',
+                            amount,
+                            productDetails,
+                            {
+                                name: customer?.name || 'Customer',
+                                email: 'customer@rently.com',
+                                phone: customer?.phone || ''
+                            }
+                        );
+
+                        return res.json({
+                            success: true,
+                            qrString: duitkuResp.qrString,
+                            paymentUrl: duitkuResp.paymentUrl,
+                            transactionId: transaction.id,
+                            suffix: 'RETURN'
+                        });
+                    } catch (err: any) {
+                        console.error('[Return] Duitku QRIS generation failed:', err);
+                        return res.status(500).json({ error: `Duitku Error: ${err.message || 'Unknown'}` });
+                    }
+                }
+            }
+
+            // 2. Regular Flow (Manual Payment or No Payment)
             await prisma.$transaction(async (tx) => {
-                // 1. Record Fines if any
+                // a. Record Fines if any
                 let totalFineAmount = 0;
                 if (fines && fines.length > 0) {
                     for (const fine of fines) {
@@ -364,8 +651,7 @@ export const transactionController = {
                     }
                 }
 
-                // 2. Process Payment if any (for Fines or Late Fees)
-                const { payment } = req.body;
+                // b. Process Payment if any (Regular Manual)
                 let addedPayment = 0;
                 if (payment && payment.amount > 0) {
                     await tx.payment.create({
@@ -379,24 +665,17 @@ export const transactionController = {
                     addedPayment = parseFloat(payment.amount);
                 }
 
-                // 3. Update Transaction (Status, Dates, Amounts)
-                // Deposit Logic:
+                // c. Update Transaction (Status, Dates, Amounts)
                 const depositAmount = transaction.depositAmount || 0;
                 let usedDeposit = 0;
                 let newDepositStatus = transaction.depositStatus;
 
                 if (depositAmount > 0 && totalFineAmount > 0) {
                     usedDeposit = Math.min(depositAmount, totalFineAmount);
-                    // Determine Status
-                    if (usedDeposit === depositAmount) newDepositStatus = 'DEDUCTED'; // Fully used
-                    else newDepositStatus = 'PARTIAL'; // Partially used, some should be refunded
-
-                    // IF fines covered fully by deposit, we consider that fine AMOUNT as paid?
-                    // We increment paidAmount by the usedDeposit effectively transferring it from "Held" to "Paid".
+                    if (usedDeposit === depositAmount) newDepositStatus = 'DEDUCTED';
+                    else newDepositStatus = 'PARTIAL';
                 } else if (depositAmount > 0 && totalFineAmount === 0) {
-                    newDepositStatus = 'REFUNDED'; // Mark as refunded ideally, or 'TO_REFUND'
-                    // For now, let's assume if no fines, it is REFUNDED logic handled in frontend or cash drawer.
-                    // We mark it REFUNDED here to close the loop.
+                    newDepositStatus = 'REFUNDED';
                 }
 
                 await tx.transaction.update({
@@ -404,56 +683,45 @@ export const transactionController = {
                     data: {
                         status: 'RETURNED',
                         actualReturnDate: new Date(returnDate || new Date()),
-                        totalAmount: { increment: totalFineAmount }, // Add fines to total obligation
-                        paidAmount: { increment: addedPayment + usedDeposit }, // Add payment + used deposit
-                        depositStatus: newDepositStatus
+                        totalAmount: { increment: totalFineAmount },
+                        paidAmount: { increment: addedPayment + usedDeposit },
+                        depositStatus: newDepositStatus,
+                        returnedById: req.user?.id ?? null
                     }
                 });
 
-                // 4. Move Items to Laundry Queue (Update status only, log created later)
+                // d. Move Items to Laundry Queue
                 for (const item of transaction.items) {
-                    // Update Instance to IN_LAUNDRY
                     await tx.itemInstance.update({
                         where: { sku: item.itemInstanceSku },
                         data: { status: 'IN_LAUNDRY' }
                     });
                     laundrySkus.push(item.itemInstanceSku);
-                    console.log(`Item ${item.itemInstanceSku} status updated to IN_LAUNDRY`);
                 }
             });
 
-            // 5. Create Laundry Logs AFTER transaction success (non-blocking)
-            console.log('LaundrySkus to create logs for:', laundrySkus);
+            // 3. Create Laundry Logs AFTER transaction success (non-blocking)
             if (laundrySkus.length > 0) {
                 for (const sku of laundrySkus) {
                     try {
-                        console.log(`Attempting to create LaundryLog for SKU: ${sku}`);
-                        const logResult = await prisma.laundryLog.create({
+                        await prisma.laundryLog.create({
                             data: {
                                 itemInstanceSku: sku,
                                 status: 'WAITING'
                             }
                         });
-                        console.log(`LaundryLog created successfully:`, logResult);
                     } catch (laundryError: any) {
-                        console.error(`FAILED to create LaundryLog for ${sku}:`);
-                        console.error('Error name:', laundryError.name);
-                        console.error('Error message:', laundryError.message);
-                        console.error('Error code:', laundryError.code);
-                        console.error('Full error:', laundryError);
-                        // Continue to next SKU instead of failing entirely
+                        console.error(`FAILED to create LaundryLog for ${sku}:`, laundryError.message);
                     }
                 }
-            } else {
-                console.log('No laundrySkus to process - transaction.items might be empty');
             }
 
-            console.log('Return processed successfully');
+            console.log('[Return] Processed successfully (Manual/No Payment)');
             res.json({ success: true, message: 'Return processed successfully' });
 
-        } catch (error) {
-            console.error('Return error:', error);
-            res.status(500).json({ error: 'Return failed' });
+        } catch (error: any) {
+            console.error('[Return] Global Error:', error);
+            res.status(400).json({ error: error.message || 'Return failed' });
         }
     },
 
@@ -750,6 +1018,21 @@ export const transactionController = {
 
         } catch (error: any) {
             console.error("Get Schedule Error", error);
+            res.status(500).json({ error: error.message });
+        }
+    },
+
+    // Public Status Check for Online Polling
+    getTransactionStatus: async (req: Request, res: Response) => {
+        try {
+            const { id } = req.params;
+            const transaction = await prisma.transaction.findUnique({
+                where: { id: parseInt(id as string) },
+                select: { status: true, paymentStatus: true }
+            });
+            if (!transaction) return res.status(404).json({ error: 'Transaction not found' });
+            res.json(transaction);
+        } catch (error: any) {
             res.status(500).json({ error: error.message });
         }
     }

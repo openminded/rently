@@ -13,6 +13,7 @@ export default function Customers() {
             columns={[
                 { key: 'name', label: t('common.name'), render: (i: any) => <span className="font-medium text-gray-900">{i.name}</span> },
                 { key: 'phone', label: 'Phone' },
+                { key: 'email', label: 'Email' },
                 { key: 'address', label: 'Address' },
                 { key: 'identityCardNumber', label: 'KTP', render: (i: any) => i.identityCardNumber || '-' },
                 {
@@ -26,6 +27,7 @@ export default function Customers() {
             fields={[
                 { name: 'name', label: t('common.name'), required: true },
                 { name: 'phone', label: 'Phone Number', required: true },
+                { name: 'email', label: 'Email Address', required: true },
                 { name: 'address', label: 'Address', required: true },
                 { name: 'identityCardNumber', label: 'KTP / ID Number', required: true },
                 { name: 'identityCardImage', label: 'KTP Image', type: 'file', required: true }

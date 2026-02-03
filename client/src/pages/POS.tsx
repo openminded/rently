@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { Search, Plus, ShoppingCart, User, Calendar, Trash2, ChevronDown, ChevronUp } from 'lucide-react';
+import { QRCodeCanvas } from 'qrcode.react';
 
 import { useAuth } from '../context/AuthContext';
 import { useLanguage } from '../context/LanguageContext';
@@ -66,6 +67,10 @@ export default function POS() {
     // Availability Check State
     const [availabilityMap, setAvailabilityMap] = useState<{ [key: number]: boolean }>({});
     const [checkingAvailability, setCheckingAvailability] = useState(false);
+
+    // QRIS Payment Modal State
+    const [qrisModal, setQrisModal] = useState<{ isOpen: boolean, paymentUrl?: string, qrString?: string, transactionId?: number }>({ isOpen: false });
+    const pollingInterval = useRef<any>(null);
 
     const handleCustomerSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -455,7 +460,39 @@ export default function POS() {
 
                 // Open Invoice (Always open invoice)
                 const txData = await res.json();
-                window.open(`/invoice/${txData.transactionId || txData.id}`, '_blank');
+
+                // If it is GATEWAY, show QRIS Modal instead of directly opening invoice
+                const selectedPM = paymentMethods.find(pm => pm.id === selectedPaymentMethod);
+                if (selectedPM?.type === 'GATEWAY') {
+                    setQrisModal({
+                        isOpen: true,
+                        paymentUrl: txData.paymentUrl,
+                        qrString: txData.qrString,
+                        transactionId: txData.transactionId || txData.id
+                    });
+
+                    // Start Polling for status
+                    const txId = txData.transactionId || txData.id;
+                    pollingInterval.current = setInterval(async () => {
+                        try {
+                            const statusRes = await fetch(`${API_URL}/payments/duitku/status/${txId}`, {
+                                headers: { 'Authorization': `Bearer ${token}` }
+                            });
+                            const statusData = await statusRes.json();
+                            // resultCode '00' is success in Duitku, '01' is pending
+                            if (statusData.resultCode === '00') {
+                                clearInterval(pollingInterval.current);
+                                setQrisModal({ isOpen: false });
+                                alert(t('pos.alert.success'));
+                                window.open(`/invoice/${txId}`, '_blank');
+                            }
+                        } catch (err) {
+                            console.error('Polling error:', err);
+                        }
+                    }, 5000);
+                } else {
+                    window.open(`/invoice/${txData.transactionId || txData.id}`, '_blank');
+                }
             } else {
                 const err = await res.json();
                 alert(`Transaction failed: ${err.error}`);
@@ -798,7 +835,6 @@ export default function POS() {
                             value={selectedPaymentMethod || ''}
                             onChange={(e) => setSelectedPaymentMethod(e.target.value ? parseInt(e.target.value) : null)}
                         >
-                            {/* If no method selected initially, show placeholder */}
                             <option value="" disabled>{t('pos.alert.selectPayment')}</option>
                             {paymentMethods.map(pm => (
                                 <option key={pm.id} value={pm.id}>
@@ -807,6 +843,20 @@ export default function POS() {
                             ))}
                         </select>
                         {paymentMethods.length === 0 && <p className="text-xs text-gray-400 col-span-2">{t('pos.paymentMethod.notFound')}</p>}
+
+                        {/* Account Info for Transfer Methods */}
+                        {(() => {
+                            const selectedPM = paymentMethods.find(pm => pm.id === selectedPaymentMethod);
+                            if (selectedPM?.type === 'TRANSFER' && selectedPM.account && selectedPM.account !== '-') {
+                                return (
+                                    <div className="mt-2 p-3 bg-blue-50 border border-blue-100 rounded-lg">
+                                        <p className="text-[10px] text-blue-500 uppercase font-bold mb-1">Account Info / No. Rekening</p>
+                                        <p className="text-sm font-bold text-blue-900">{selectedPM.account}</p>
+                                    </div>
+                                );
+                            }
+                            return null;
+                        })()}
                     </div>
 
                     {/* Payment Input */}
@@ -1035,6 +1085,59 @@ export default function POS() {
                                 className="px-4 py-2 text-sm font-medium text-gray-600 hover:text-gray-900"
                             >
                                 {t('common.cancel')}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+            {/* QRIS Payment Modal */}
+            {qrisModal.isOpen && (
+                <div className="fixed inset-0 bg-black/50 z-[60] flex items-center justify-center p-4">
+                    <div className="bg-white rounded-2xl shadow-xl w-full max-w-sm p-6 flex flex-col items-center gap-6 animate-in zoom-in duration-200">
+                        <div className="text-center">
+                            <h3 className="text-xl font-bold text-gray-900">Pembayaran QRIS</h3>
+                            <p className="text-sm text-gray-500 mt-1">Silakan scan kode QR di bawah ini</p>
+                        </div>
+
+                        <div className="bg-white p-4 rounded-xl border-2 border-dashed border-gray-100 shadow-inner">
+                            <div className="text-center space-y-4">
+                                {qrisModal.qrString ? (
+                                    <div className="flex flex-col items-center gap-4">
+                                        <div className="bg-white p-2 border rounded-lg shadow-sm">
+                                            <QRCodeCanvas value={qrisModal.qrString} size={200} level="H" />
+                                        </div>
+                                        <p className="text-xs text-gray-400 font-bold">SCAN KODE QR INI</p>
+                                    </div>
+                                ) : qrisModal.paymentUrl ? (
+                                    <>
+                                        <p className="text-xs text-gray-400">Menunggu pembayaran...</p>
+                                        <a
+                                            href={qrisModal.paymentUrl}
+                                            target="_blank"
+                                            rel="noreferrer"
+                                            className="block bg-blue-600 text-white py-2 px-4 rounded-lg font-bold hover:bg-blue-700"
+                                        >
+                                            Buka Halaman Pembayaran
+                                        </a>
+                                    </>
+                                ) : (
+                                    <div className="text-center py-4">
+                                        <p className="text-sm text-red-500 font-bold mb-2">Gagal Menghasilkan Pembayaran</p>
+                                        <p className="text-xs text-gray-500">Silakan tutup modal ini dan coba lagi, atau hubungi admin.</p>
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+
+                        <div className="w-full space-y-3">
+                            <button
+                                onClick={() => {
+                                    clearInterval(pollingInterval.current);
+                                    setQrisModal({ isOpen: false });
+                                }}
+                                className="w-full py-3 text-sm font-medium text-gray-500 hover:text-gray-900 border border-gray-200 rounded-xl"
+                            >
+                                Tutup
                             </button>
                         </div>
                     </div>

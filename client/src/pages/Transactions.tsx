@@ -1,6 +1,7 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { Eye, CheckCircle, Printer, WashingMachine, Wallet, AlertTriangle, Calendar, ShoppingCart, Clock, Search } from 'lucide-react';
+import { Search, Plus, Calendar, User, ShoppingCart, Filter, Download, MoreVertical, Trash2, CheckCircle, Clock, AlertCircle, Eye, Printer, ChevronLeft, ChevronRight, X, UserPlus, Phone, MapPin, CreditCard, ChevronDown, ChevronUp, WashingMachine, Wallet, AlertTriangle } from 'lucide-react';
+import { QRCodeCanvas } from 'qrcode.react';
 import { clsx } from 'clsx';
 import { DataTable, type Column } from '../components/common/DataTable';
 import { useAuth } from '../context/AuthContext';
@@ -11,6 +12,7 @@ import { API_BASE_URL } from '../config/api';
 const API_URL = API_BASE_URL;
 
 import { useBarcodeScanner } from '../hooks/useBarcodeScanner';
+
 
 interface TransactionsProps {
     type: 'booking' | 'waiting-pickup' | 'rent' | 'need-return' | 'laundry' | 'completed';
@@ -72,6 +74,10 @@ export default function Transactions({ type: initialType }: TransactionsProps) {
     const [selectedViolations, setSelectedViolations] = useState<{ violationTypeId: number, amount: number, note: string }[]>([]);
     const [returnPayAmount, setReturnPayAmount] = useState(0);
     const [returnPayMethodId, setReturnPayMethodId] = useState(0);
+
+    // QRIS State
+    const [qrisModal, setQrisModal] = useState<{ isOpen: boolean, paymentUrl?: string, qrString?: string, transactionId?: number }>({ isOpen: false });
+    const pollingInterval = useRef<any>(null);
 
     useEffect(() => {
         fetchData();
@@ -225,10 +231,6 @@ export default function Transactions({ type: initialType }: TransactionsProps) {
         try {
             const payAmount = parseFloat(pickupPayment);
 
-            // Start Logic Branching
-            // If Booking Tab -> Use /pay endpoint (Confirm Booking/DP)
-            // If Waiting Pickup -> Use /pickup endpoint (Finalize)
-
             const isBookingConfirmation = currentType === 'booking';
             const endpoint = isBookingConfirmation ? 'pay' : 'pickup';
 
@@ -246,10 +248,25 @@ export default function Transactions({ type: initialType }: TransactionsProps) {
                     } : undefined
                 })
             });
+
             if (res.ok) {
-                alert(t('transactions.pickup.success'));
-                setShowPickupModal(false);
-                fetchData();
+                const data = await res.json();
+
+                // If it is GATEWAY (Duitku), show QRIS Modal
+                const selectedPM = paymentMethods.find(pm => pm.id.toString() === selectedPaymentMethod);
+                if (selectedPM?.type === 'GATEWAY') {
+                    setQrisModal({
+                        isOpen: true,
+                        paymentUrl: data.paymentUrl,
+                        qrString: data.qrString,
+                        transactionId: data.transactionId || selectedTx.id
+                    });
+                    startPolling(data.transactionId || selectedTx.id);
+                } else {
+                    alert(t('transactions.pickup.success'));
+                    setShowPickupModal(false);
+                    fetchData();
+                }
             } else {
                 const err = await res.json();
                 alert(`${t('common.error')}: ${err.error || err.message}`);
@@ -259,6 +276,38 @@ export default function Transactions({ type: initialType }: TransactionsProps) {
             alert(t('common.error'));
         }
     };
+
+    const startPolling = (txId: number) => {
+        if (pollingInterval.current) clearInterval(pollingInterval.current);
+
+        pollingInterval.current = setInterval(async () => {
+            try {
+                const res = await fetch(`${API_URL}/payments/duitku/status/${txId}`, {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                if (res.ok) {
+                    const statusData = await res.json();
+                    // resultCode '00' is success in Duitku, '01' is pending
+                    if (statusData.resultCode === '00') {
+                        clearInterval(pollingInterval.current);
+                        setQrisModal({ isOpen: false });
+                        alert(t('pos.alert.success'));
+                        setShowPickupModal(false);
+                        setShowReturnModal(false);
+                        fetchData(); // Refresh table
+                    }
+                }
+            } catch (err) {
+                console.error("Polling error:", err);
+            }
+        }, 5000);
+    };
+
+    useEffect(() => {
+        return () => {
+            if (pollingInterval.current) clearInterval(pollingInterval.current);
+        };
+    }, []);
 
     const handleReturnClick = (tx: any) => {
         setSelectedTx(tx);
@@ -343,9 +392,22 @@ export default function Transactions({ type: initialType }: TransactionsProps) {
             });
 
             if (res.ok) {
-                alert(t('transactions.return.success'));
-                setShowReturnModal(false);
-                fetchData();
+                const data = await res.json();
+
+                // If it is GATEWAY (Duitku), show QRIS Modal
+                if (data.qrString || data.paymentUrl) {
+                    setQrisModal({
+                        isOpen: true,
+                        paymentUrl: data.paymentUrl,
+                        qrString: data.qrString,
+                        transactionId: data.transactionId || selectedTx.id
+                    });
+                    startPolling(data.transactionId || selectedTx.id);
+                } else {
+                    alert(t('transactions.return.success'));
+                    setShowReturnModal(false);
+                    fetchData();
+                }
             } else {
                 const err = await res.json();
                 alert(`${t('common.error')}: ${err.error}`);
@@ -595,7 +657,22 @@ export default function Transactions({ type: initialType }: TransactionsProps) {
             header: t('transactions.table.customer'),
             accessorKey: 'customerId',
             sortable: true,
-            cell: (tx) => tx.customer?.name || '-'
+            cell: (tx) => (
+                <div className="flex flex-col">
+                    <span className="font-bold">{tx.customer?.name || '-'}</span>
+                    <div className="mt-1">
+                        {tx.source === 'ONLINE' ? (
+                            <span className="px-2 py-0.5 bg-blue-100 text-blue-700 rounded text-[10px] font-black uppercase tracking-widest border border-blue-200">
+                                Online
+                            </span>
+                        ) : (
+                            <span className="px-2 py-0.5 bg-gray-100 text-gray-700 rounded text-[10px] font-black uppercase tracking-widest border border-gray-200">
+                                Offline
+                            </span>
+                        )}
+                    </div>
+                </div>
+            )
         },
         {
             header: t('transactions.table.dates'),
@@ -879,6 +956,19 @@ export default function Transactions({ type: initialType }: TransactionsProps) {
                                                 <option key={m.id} value={m.id}>{m.name}</option>
                                             ))}
                                         </select>
+                                        {/* Account Info for Transfer Methods */}
+                                        {(() => {
+                                            const selectedPM = paymentMethods.find(pm => pm.id.toString() === selectedPaymentMethod);
+                                            if (selectedPM?.type === 'TRANSFER' && selectedPM.account && selectedPM.account !== '-') {
+                                                return (
+                                                    <div className="mt-2 p-2 bg-blue-50 border border-blue-100 rounded-lg">
+                                                        <p className="text-[10px] text-blue-500 uppercase font-bold mb-0.5">Account Info</p>
+                                                        <p className="text-xs font-bold text-blue-900">{selectedPM.account}</p>
+                                                    </div>
+                                                );
+                                            }
+                                            return null;
+                                        })()}
                                     </div>
                                     <div>
                                         <label className="block text-xs font-bold text-gray-500 mb-1">{t('transactions.pickup.note')}</label>
@@ -1008,6 +1098,19 @@ export default function Transactions({ type: initialType }: TransactionsProps) {
                                                 <option key={m.id} value={m.id}>{m.name}</option>
                                             ))}
                                         </select>
+                                        {/* Account Info for Transfer Methods */}
+                                        {(() => {
+                                            const selectedPM = paymentMethods.find(pm => pm.id === returnPayMethodId);
+                                            if (selectedPM?.type === 'TRANSFER' && selectedPM.account && selectedPM.account !== '-') {
+                                                return (
+                                                    <div className="mt-2 p-2 bg-blue-50 border border-blue-100 rounded-lg">
+                                                        <p className="text-[10px] text-blue-500 uppercase font-bold mb-0.5">Account Info</p>
+                                                        <p className="text-xs font-bold text-blue-900">{selectedPM.account}</p>
+                                                    </div>
+                                                );
+                                            }
+                                            return null;
+                                        })()}
                                     </div>
                                 </div>
                             )}
@@ -1141,6 +1244,59 @@ export default function Transactions({ type: initialType }: TransactionsProps) {
 
                         <div className="mt-8 flex justify-end">
                             <button onClick={() => setShowDetailModal(false)} className="px-4 py-2 bg-gray-100 text-gray-700 font-bold rounded-lg hover:bg-gray-200">Close</button>
+                        </div>
+                    </div>
+                </div>
+            )}
+            {/* QRIS Payment Modal */}
+            {qrisModal.isOpen && (
+                <div className="fixed inset-0 bg-black/50 z-[60] flex items-center justify-center p-4">
+                    <div className="bg-white rounded-2xl shadow-xl w-full max-w-sm p-6 flex flex-col items-center gap-6 animate-in zoom-in duration-200">
+                        <div className="text-center">
+                            <h3 className="text-xl font-bold text-gray-900">Pembayaran QRIS</h3>
+                            <p className="text-sm text-gray-500 mt-1">Silakan scan kode QR di bawah ini</p>
+                        </div>
+
+                        <div className="bg-white p-4 rounded-xl border-2 border-dashed border-gray-100 shadow-inner">
+                            <div className="text-center space-y-4">
+                                {qrisModal.qrString ? (
+                                    <div className="flex flex-col items-center gap-4">
+                                        <div className="bg-white p-2 border rounded-lg shadow-sm">
+                                            <QRCodeCanvas value={qrisModal.qrString} size={200} level="H" />
+                                        </div>
+                                        <p className="text-xs text-gray-400 font-bold">SCAN KODE QR INI</p>
+                                    </div>
+                                ) : qrisModal.paymentUrl ? (
+                                    <>
+                                        <p className="text-xs text-gray-400">Menunggu pembayaran...</p>
+                                        <a
+                                            href={qrisModal.paymentUrl}
+                                            target="_blank"
+                                            rel="noreferrer"
+                                            className="block bg-blue-600 text-white py-2 px-4 rounded-lg font-bold hover:bg-blue-700"
+                                        >
+                                            Buka Halaman Pembayaran
+                                        </a>
+                                    </>
+                                ) : (
+                                    <div className="text-center py-4">
+                                        <p className="text-sm text-red-500 font-bold mb-2">Gagal Menghasilkan Pembayaran</p>
+                                        <p className="text-xs text-gray-500">Silakan tutup modal ini dan coba lagi, atau hubungi admin.</p>
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+
+                        <div className="w-full space-y-3">
+                            <button
+                                onClick={() => {
+                                    if (pollingInterval.current) clearInterval(pollingInterval.current);
+                                    setQrisModal({ isOpen: false });
+                                }}
+                                className="w-full py-3 text-sm font-medium text-gray-500 hover:text-gray-900 border border-gray-200 rounded-xl"
+                            >
+                                Tutup
+                            </button>
                         </div>
                     </div>
                 </div>

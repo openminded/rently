@@ -106,16 +106,20 @@ async function main() {
 
   // --- PAYMENT METHODS ---
   const paymentMethods = [
-    { name: 'Cash', account: '-' },
-    { name: 'Transfer BCA', account: '1234567890' },
-    { name: 'Transfer Mandiri', account: '0987654321' },
-    { name: 'QRIS', account: 'N/A' }
+    { name: 'Cash', type: 'CASH', account: '-' },
+    { name: 'Transfer BCA', type: 'TRANSFER', account: '1234567890 a/n PT Rumah Dinar' },
+    { name: 'Transfer Mandiri', type: 'TRANSFER', account: '0987654321 a/n PT Rumah Dinar' },
+    { name: 'Payment Gateway - Duitku (automatic)', type: 'GATEWAY', account: 'N/A' }
   ];
   for (const pm of paymentMethods) {
     await prisma.paymentMethod.upsert({
       where: { name: pm.name },
-      update: {},
-      create: pm
+      update: { type: pm.type as any, account: pm.account },
+      create: {
+        name: pm.name,
+        type: pm.type as any,
+        account: pm.account
+      }
     });
   }
   console.log('PaymentMethods seeded.');

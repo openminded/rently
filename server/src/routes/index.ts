@@ -27,11 +27,9 @@ import tempSeed from './tempSeed.js';
 router.use('/seed', tempSeed);
 
 // Public Routes (No Auth)
-import { inventoryController } from '../controllers/inventoryController.js';
-import { masterController } from '../controllers/masterController.js';
+import publicRoutes from './publicRoutes.js';
 
-router.get('/public/items', inventoryController.getItems);
-router.get('/public/categories', masterController.categories.getAll);
+router.use('/public', publicRoutes);
 
 
 
