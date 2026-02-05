@@ -633,11 +633,11 @@ export default function LandingPage() {
                     </div>
                     <div className="order-1 md:order-2">
                         <h2 className="text-4xl font-black text-[#2B211B] mb-6 uppercase leading-tight">
-                            {appSettings.LANDING_ABOUT_TITLE || 'Tentang Rumah Dinar'}
+                            {appSettings.LANDING_ABOUT_TITLE || 'Tentang Werently'}
                         </h2>
                         <div className="w-20 h-1 bg-[#A67C52] mb-8 rounded-full"></div>
                         <p className="text-[#5D4037] text-lg leading-relaxed font-medium">
-                            {appSettings.LANDING_ABOUT_DESC || 'Rumah Dinar hadir untuk menjawab kebutuhan fashion premium tanpa harus membeli.'}
+                            {appSettings.LANDING_ABOUT_DESC || 'Werently hadir untuk menjawab kebutuhan fashion premium tanpa harus membeli.'}
                         </p>
                     </div>
                 </div>

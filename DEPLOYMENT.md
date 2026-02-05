@@ -1,6 +1,6 @@
-# Deployment Guide - Rumah Dinar
+# Deployment Guide - Werently
 
-Berikut adalah panduan langkah demi langkah untuk melakukan deployment aplikasi Rumah Dinar ke server production (AA Panel).
+Berikut adalah panduan langkah demi langkah untuk melakukan deployment aplikasi Werently ke server production (AA Panel).
 
 ## Prasyarat
 - Akses SSH ke server atau Terminal di AA Panel.

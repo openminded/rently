@@ -438,8 +438,8 @@ export default function AppConfig() {
                                 />
                             </div>
                             <div className={`transition-opacity ${settings.LANDING_ENABLE_ABOUT === 'false' ? 'opacity-50 pointer-events-none' : ''}`}>
-                                <SettingInput label="Judul" code="LANDING_ABOUT_TITLE" value={settings.LANDING_ABOUT_TITLE} onChange={handleLocalChange} placeholder="Default: Tentang Rumah Dinar" />
-                                <SettingInput label="Deskripsi Lengkap" code="LANDING_ABOUT_DESC" value={settings.LANDING_ABOUT_DESC} onChange={handleLocalChange} isTextarea placeholder="Default: Rumah Dinar hadir..." />
+                                <SettingInput label="Judul" code="LANDING_ABOUT_TITLE" value={settings.LANDING_ABOUT_TITLE} onChange={handleLocalChange} placeholder="Default: Tentang Werently" />
+                                <SettingInput label="Deskripsi Lengkap" code="LANDING_ABOUT_DESC" value={settings.LANDING_ABOUT_DESC} onChange={handleLocalChange} isTextarea placeholder="Default: Werently hadir..." />
                                 <div className="mt-4">
                                     <SettingInput label="Gambar Ilustrasi (Landscape)" code="LANDING_ABOUT_IMAGE" value={settings.LANDING_ABOUT_IMAGE} onChange={handleLocalChange} isImage placeholder="Upload Gambar..." />
                                 </div>

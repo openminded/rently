@@ -64,7 +64,7 @@ class WhatsAppService {
                 creds: state.creds,
                 keys: makeCacheableSignalKeyStore(state.keys, logger),
             },
-            browser: ['Rumah Dinar', 'Safari', '1.0.0'],
+            browser: ['Werently', 'Safari', '1.0.0'],
             generateHighQualityLinkPreview: true,
         });
 

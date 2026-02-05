@@ -283,7 +283,7 @@ export default function Invoice() {
 
                     {/* Footer */}
                     <div className="border-t pt-8 text-center text-xs text-gray-400">
-                        <p>{t('invoice.thankYou', { brand: settings.BRAND_NAME || 'Rumah Dinar' })}</p>
+                        <p>{t('invoice.thankYou', { brand: settings.BRAND_NAME || 'Werently' })}</p>
                         <p className="mt-1">{t('invoice.followUs', { social: settings.BRAND_SOCIAL || '@rumahdinar' })}</p>
                     </div>
                 </div>

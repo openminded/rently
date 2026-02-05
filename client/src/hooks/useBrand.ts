@@ -14,7 +14,7 @@ interface BrandSettings {
 export function useBrand() {
     const { token } = useAuth();
     const [brand, setBrand] = useState<BrandSettings>({
-        name: 'Rumah Dinar', // Default
+        name: 'Werently', // Default
         logo: '',
         loading: true
     });
@@ -44,7 +44,7 @@ export function useBrand() {
 
                 if (data) {
                     setBrand({
-                        name: data.BRAND_NAME || 'Rumah Dinar',
+                        name: data.BRAND_NAME || 'Werently',
                         logo: data.BRAND_LOGO || '',
                         loading: false
                     });

@@ -52,8 +52,8 @@ router.get('/', async (req, res) => {
             { key: 'LANDING_HOWTO_STEP_4_DESC', value: 'Kembalikan H+1. Tidak perlu dicuci, kami yang urus laundry.' },
 
             // ABOUT US
-            { key: 'LANDING_ABOUT_TITLE', value: 'Tentang Rumah Dinar' },
-            { key: 'LANDING_ABOUT_DESC', value: 'Rumah Dinar hadir untuk menjawab kebutuhan fashion premium tanpa harus membeli. Kami percaya bahwa setiap orang berhak tampil istimewa di momen spesial mereka dengan busana berkualitas tinggi, bersih, dan wangi.' },
+            { key: 'LANDING_ABOUT_TITLE', value: 'Tentang Werently' },
+            { key: 'LANDING_ABOUT_DESC', value: 'Werently hadir untuk menjawab kebutuhan fashion premium tanpa harus membeli. Kami percaya bahwa setiap orang berhak tampil istimewa di momen spesial mereka dengan busana berkualitas tinggi, bersih, dan wangi.' },
             { key: 'LANDING_ABOUT_IMAGE', value: '/feature_sq.png' },
 
             // CONTACT

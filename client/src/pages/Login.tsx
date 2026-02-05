@@ -53,6 +53,23 @@ export default function Login() {
                 </div>
 
                 <div className="p-8">
+                    <div className="mb-6 p-4 bg-indigo-50 border border-indigo-100 rounded-xl">
+                        <p className="text-xs font-bold text-indigo-600 uppercase tracking-widest mb-2 flex items-center gap-2">
+                            <span className="w-1.5 h-1.5 bg-indigo-600 rounded-full animate-pulse"></span>
+                            Demo Account
+                        </p>
+                        <div className="grid grid-cols-2 gap-4">
+                            <div>
+                                <p className="text-[10px] text-indigo-400 font-bold uppercase tracking-tighter">Username</p>
+                                <p className="text-sm font-black text-slate-900">owner</p>
+                            </div>
+                            <div>
+                                <p className="text-[10px] text-indigo-400 font-bold uppercase tracking-tighter">Password</p>
+                                <p className="text-sm font-black text-slate-900">owner</p>
+                            </div>
+                        </div>
+                    </div>
+
                     <form onSubmit={handleSubmit} className="space-y-6">
                         {error && (
                             <div className="p-3 bg-red-50 text-red-600 text-sm rounded-lg border border-red-100 flex items-start">

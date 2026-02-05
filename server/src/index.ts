@@ -43,7 +43,7 @@ initBroadcastJob();
 
 
 app.get('/', (req, res) => {
-    res.send('Rumah Dinar POS API is running');
+    res.send('Werently POS API is running');
 });
 
 // Global Fallback to debug 404s

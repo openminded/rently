@@ -40,7 +40,7 @@ export default function NotFound() {
             </div>
 
             <p className="mt-8 text-gray-400 text-sm">
-                &copy; {new Date().getFullYear()} Rumah Dinar. All rights reserved.
+                &copy; {new Date().getFullYear()} Werently. All rights reserved.
             </p>
         </div>
     );

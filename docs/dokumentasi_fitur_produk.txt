@@ -1,7 +1,7 @@
 # DOKUMENTASI LENGKAP FITUR APLIKASI RUMAH DINAR
 
 ## PENDAHULUAN
-Aplikasi Rumah Dinar adalah sistem manajemen toko sewa busana yang terintegrasi, mencakup Point of Sale (Kasir), Manajemen Inventori, Laporan Keuangan, hingga Landing Page publik yang dinamis.
+Aplikasi Werently adalah sistem manajemen toko sewa busana yang terintegrasi, mencakup Point of Sale (Kasir), Manajemen Inventori, Laporan Keuangan, hingga Landing Page publik yang dinamis.
 
 ---
 
@@ -32,17 +32,18 @@ Pusat operasional penyewaan harian.
     *   *Booking (DP):* Untuk pelanggan yang membooking baju untuk tanggal mendatang. Wajib membayar DP (Down Payment).
     *   *Direct Pickup (Langsung Ambil):* Untuk pelanggan yang datang, bayar lunas, dan langsung bawa barang. Wajib pembayaran penuh.
     *   *Immediate:* Mode cepat untuk transaksi non-sewa (jika ada).
-*   **Cek Stok Real-time:** Saat memilih tanggal sewa (Start & End Date), sistem otomatis mengecek apakah baju tersebut tersedia di tanggal itu. Jika "Out of Stock", kasir tidak bisa memproses.
-*   **Manajemen Deposit:** Kolom khusus untuk memasukkan jenis jaminan (KTP/Uang Tunai/SIM) yang dipilih dari Master Data. 
-*   **Admin Fee Otomatis:** Biaya admin bisa disetting apakah "Per Transaksi" (flat) atau "Per Barang".
-*   **Invoice Digital:** Setelah transaksi sukses, invoice otomatis tercetak atau bisa dikirim digital.
+*   **Integrasi Payment Gateway (Duitku QRIS):** 
+    *   Mendukung pembayaran otomatis via QRIS. 
+    *   Status transaksi otomatis berubah menjadi "PAID" setelah pelanggan membayar.
+    *   Jika Full Payment (Direct Pickup), status barang otomatis menjadi "RENTED".
+    *   Jika Return Payment, status barang otomatis menjadi "IN_LAUNDRY".
 
 **Flow Transaksi:**
 1.  Pilih Produk dari katalog (bisa cari nama/kode).
 2.  Isi data Customer (atau pilih dari daftar Customer Lama).
 3.  Tentukan Tanggal Sewa & Tanggal Kembali.
 4.  Pilih Metode Transaksi (Booking/Direct).
-5.  Pilih Metode Pembayaran & Deposit.
+5.  Pilih Metode Pembayaran (Cash/QRIS). Jika QRIS, sistem akan men-generate kode QR.
 6.  Klik "Process". Stok otomatis berkurang untuk tanggal tersebut.
 
 ---
@@ -73,7 +74,8 @@ Fitur untuk melacak baju kotor dan bersih.
 **Fitur Utama:**
 *   **Partner Laundry:** Database tempat laundry rekanan.
 *   **In-Process Tracking:** Mencatat baju mana saja yang dikirim ke laundry, kapan dikirim, dan estimasi selesai.
-*   **Restock Otomatis:** Saat baju ditandai "Selesai Laundry", status stok otomatis berubah kembali menjadi "Available".
+*   **Batch Completion Detail:** Saat menandai satu batch laundry selesai, kasir bisa memilih status tiap item (BAIK, RUSAK, atau HILANG).
+*   **Restock Otomatis:** Saat baju ditandai "Selesai Laundry" (BAIK), status produk otomatis berubah kembali menjadi "Available".
 
 ---
 
@@ -92,7 +94,10 @@ Fitur pemasaran untuk mengirim pesan massal ke pelanggan.
 
 **Fitur Utama:**
 *   **Filter Target:** Kirim pesan ke semua pelanggan, atau spesifik (misal: Pelanggan yang menyewa bulan lalu).
-*   **Template Pesan:** Simpan template promosi agar tidak perlu ketik ulang.
+*   **Template Pesan:** Simpan template promosi, pemberitahuan, atau invoice.
+*   **Automated Reminders:** 
+    *   **Reminder Pickup:** Pesan otomatis dikirim pada hari pelanggan harus mengambil baju.
+    *   **Reminder Return:** Pesan otomatis dikirim pada hari pelanggan harus mengembalikan baju.
 *   **Image Attachment:** Bisa kirim pesan gambar (brosur promo).
 *   **Log Pengiriman:** Laporan status pengiriman (Terkirim/Gagal).
 
@@ -103,6 +108,10 @@ Pusat data untuk pemilik bisnis.
 
 **Fitur Utama:**
 *   **Ringkasan Harian:** Total omset hari ini, barang keluar, barang harus kembali hari ini.
+*   **Laporan Keuangan:** 
+    *   **Pendapatan (Income):** Rekapitulasi uang masuk dari sewa dan denda.
+    *   **Pengeluaran (Expenses):** Pencatatan biaya operasional (listrik, gaji, cuci).
+    *   **Profit & Loss:** Ringkasan bersih bulanan.
 *   **Grafik Tren:** Melihat kenaikan/penurunan penyewaan.
 *   **Stok Alert:** Peringatan jika ada barang yang stoknya menipis atau belum kembali (Late).
 
@@ -124,9 +133,11 @@ Pengaturan dasar sistem.
 Konfigurasi sistem tanpa perlu coding.
 
 **Fitur:**
-*   **General:** Ubah Bahasa (Indo/Inggris), Atur Mode Biaya Admin.
+*   **General:** Ubah Bahasa (Indonesia/English), Atur Mode Biaya Admin.
 *   **Landing Page Config:** Atur tampilan website publik (seperti dijelaskan di poin 1).
-*   **Backup:** Fitur untuk download data database sebagai cadangan.
+*   **Backup & Security:** 
+    *   **Database Backup:** Download seluruh data transaksi & produk.
+    *   **Asset Backup:** Download seluruh file foto produk dalam bentuk ZIP agar aman jika ingin migrasi server.
 
 ---
-*Dokumen ini dibuat otomatis oleh Sistem Rumah Dinar v1.0*
+*Dokumen ini dibuat otomatis oleh Sistem Werently v1.0*

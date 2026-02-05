@@ -107,8 +107,8 @@ async function main() {
   // --- PAYMENT METHODS ---
   const paymentMethods = [
     { name: 'Cash', type: 'CASH', account: '-' },
-    { name: 'Transfer BCA', type: 'TRANSFER', account: '1234567890 a/n PT Rumah Dinar' },
-    { name: 'Transfer Mandiri', type: 'TRANSFER', account: '0987654321 a/n PT Rumah Dinar' },
+    { name: 'Transfer BCA', type: 'TRANSFER', account: '1234567890 a/n PT Werently' },
+    { name: 'Transfer Mandiri', type: 'TRANSFER', account: '0987654321 a/n PT Werently' },
     { name: 'Payment Gateway - Duitku (automatic)', type: 'GATEWAY', account: 'N/A' }
   ];
   for (const pm of paymentMethods) {
@@ -295,11 +295,11 @@ async function main() {
   const templates = [
     {
       name: 'Reminder Pickup',
-      content: 'Halo {{name}}, \n\nPesanan Anda di Rumah Dinar sudah siap diambil hari ini. \nSilakan datang ke store kami untuk pengambilan.\n\nTerima kasih!'
+      content: 'Halo {{name}}, \n\nPesanan Anda di Werently sudah siap diambil hari ini. \nSilakan datang ke store kami untuk pengambilan.\n\nTerima kasih!'
     },
     {
       name: 'Reminder Return',
-      content: 'Halo {{name}}, \n\nHari ini adalah jadwal pengembalian sewa Anda di Rumah Dinar. \nMohon kembalikan tepat waktu untuk menghindari denda keterlambatan.\n\nTerima kasih!'
+      content: 'Halo {{name}}, \n\nHari ini adalah jadwal pengembalian sewa Anda di Werently. \nMohon kembalikan tepat waktu untuk menghindari denda keterlambatan.\n\nTerima kasih!'
     }
   ];
 
