@@ -580,21 +580,21 @@ export default function WerentlyLanding() {
                         {[
                             {
                                 id: 'dash',
-                                img: '/uploads/w2.jpg',
+                                img: '/assets/landing/w2.jpg',
                                 title: (TRANSLATIONS[lang] as any).gallery.dashTitle,
                                 desc: (TRANSLATIONS[lang] as any).gallery.dashDesc,
                                 color: 'indigo'
                             },
                             {
                                 id: 'pos',
-                                img: '/uploads/w1.jpg',
+                                img: '/assets/landing/w1.jpg',
                                 title: (TRANSLATIONS[lang] as any).gallery.posTitle,
                                 desc: (TRANSLATIONS[lang] as any).gallery.posDesc,
                                 color: 'slate'
                             },
                             {
                                 id: 'fin',
-                                img: '/uploads/w4.jpg',
+                                img: '/assets/landing/w4.jpg',
                                 title: (TRANSLATIONS[lang] as any).gallery.finTitle,
                                 desc: (TRANSLATIONS[lang] as any).gallery.finDesc,
                                 color: 'violet'
