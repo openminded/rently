@@ -403,22 +403,25 @@ export const transactionController = {
                             where: { userId: (req as any).user?.id, status: 'OPEN' }
                         });
 
+                        // Cap payment at total amount (Change logic)
+                        const recordedPaymentAmount = Math.min(payment.amount, newTransaction.totalAmount);
+
                         await tx.payment.create({
                             data: {
                                 transactionId: newTransaction.id,
-                                amount: payment.amount,
+                                amount: recordedPaymentAmount,
                                 paymentMethodId: payment.methodId,
                                 createdById: req.user?.id ?? null,
                                 shiftId: activeShift?.id ?? null
                             }
                         });
 
-                        // Update Paid Amount
+                        // Update Paid Amount (use recorded amount)
                         await tx.transaction.update({
                             where: { id: newTransaction.id },
                             data: {
-                                paidAmount: payment.amount,
-                                paymentStatus: payment.amount >= (totalAmount + finalAdminFee + taxAmount) ? 'PAID' : 'PARTIAL'
+                                paidAmount: recordedPaymentAmount,
+                                paymentStatus: recordedPaymentAmount >= newTransaction.totalAmount ? 'PAID' : 'PARTIAL'
                             }
                         });
                     }
@@ -500,10 +503,15 @@ export const transactionController = {
                     where: { userId: (req as any).user?.id, status: 'OPEN' }
                 });
 
+                // Cap payment amount to remaining balance
+                const remaining = transaction.totalAmount - transaction.paidAmount;
+                const inputAmount = parseFloat(payment.amount);
+                const recordedAmount = Math.min(inputAmount, remaining);
+
                 await tx.payment.create({
                     data: {
                         transactionId: transaction.id,
-                        amount: parseFloat(payment.amount),
+                        amount: recordedAmount,
                         paymentMethodId: payment.methodId,
                         note: payment.note || 'Manual Payment',
                         createdById: req.user?.id ?? null,
@@ -511,9 +519,9 @@ export const transactionController = {
                     }
                 });
 
-                const newPaidAmount = transaction.paidAmount + parseFloat(payment.amount);
+                const newPaidAmount = transaction.paidAmount + recordedAmount;
                 let newPaymentStatus = 'PARTIAL';
-                if (newPaidAmount >= transaction.totalAmount) newPaymentStatus = 'PAID';
+                if (newPaidAmount >= transaction.totalAmount - 1) newPaymentStatus = 'PAID'; // tolerance
 
                 await tx.transaction.update({
                     where: { id: transaction.id },
@@ -605,16 +613,23 @@ export const transactionController = {
                         where: { userId: (req as any).user?.id, status: 'OPEN' }
                     });
 
+                    const remaining = transaction.totalAmount - transaction.paidAmount;
+                    const inputAmount = parseFloat(payment.amount);
+                    const recordedAmount = Math.min(inputAmount, remaining);
+
                     await tx.payment.create({
                         data: {
                             transactionId: transaction.id,
-                            amount: parseFloat(payment.amount),
+                            amount: recordedAmount,
                             paymentMethodId: payment.methodId,
                             note: payment.note || 'Pickup Payment',
                             createdById: req.user?.id ?? null,
                             shiftId: activeShift?.id ?? null
                         }
                     });
+
+                    // Update local variable for next step
+                    currentPaid += recordedAmount;
                 }
 
                 // 2. Update Transaction (Standard logic for manual payment or no payment)
