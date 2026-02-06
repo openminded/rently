@@ -1,9 +1,11 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { Search, Plus, ShoppingCart, User, Calendar, Trash2, ChevronDown, ChevronUp } from 'lucide-react';
+import { Search, Plus, ShoppingCart, User, Calendar, Trash2, ChevronDown, ChevronUp, Lock, Unlock } from 'lucide-react';
 import { QRCodeCanvas } from 'qrcode.react';
 
 import { useAuth } from '../context/AuthContext';
 import { useLanguage } from '../context/LanguageContext';
+import { useShift } from '../context/ShiftContext';
+import { OpenShiftModal } from '../components/ShiftModal';
 
 import { API_BASE_URL, getImageUrl } from '../config/api';
 
@@ -16,6 +18,15 @@ export default function POS() {
 
     const { token } = useAuth();
     const { t } = useLanguage();
+    const { currentShift, loading: shiftLoading } = useShift();
+    const [isOpenShiftModalOpen, setIsOpenShiftModalOpen] = useState(false);
+
+    useEffect(() => {
+        if (!shiftLoading && !currentShift) {
+            setIsOpenShiftModalOpen(true);
+        }
+    }, [currentShift, shiftLoading]);
+
     const [cart, setCart] = useState<any[]>([]);
     const [customer, setCustomer] = useState<any>(null);
     const [customers, setCustomers] = useState<any[]>([]);
@@ -71,6 +82,44 @@ export default function POS() {
     // QRIS Payment Modal State
     const [qrisModal, setQrisModal] = useState<{ isOpen: boolean, paymentUrl?: string, qrString?: string, transactionId?: number }>({ isOpen: false });
     const pollingInterval = useRef<any>(null);
+
+    // Referral States
+    const [referralCode, setReferralCode] = useState('');
+    const [referralId, setReferralId] = useState<number | null>(null);
+    const [referralDiscount, setReferralDiscount] = useState(0);
+    const [validatingReferral, setValidatingReferral] = useState(false);
+
+    const validateReferral = async () => {
+        if (!referralCode) return;
+        setValidatingReferral(true);
+        try {
+            const res = await fetch(`${API_URL}/referrals/validate`, {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${token}`,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ code: referralCode })
+            });
+            const data = await res.json();
+            if (data.valid) {
+                setReferralId(data.id);
+                // Calculate discount for UI
+                const discount = data.discountType === 'PERCENTAGE'
+                    ? (data.discountValue / 100) * cartTotal
+                    : data.discountValue;
+                setReferralDiscount(discount);
+            } else {
+                setReferralId(null);
+                setReferralDiscount(0);
+                alert(data.message || 'Invalid code');
+            }
+        } catch (e) {
+            console.error(e);
+        } finally {
+            setValidatingReferral(false);
+        }
+    };
 
     const handleCustomerSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -397,7 +446,8 @@ export default function POS() {
     const taxAmount = applyTax ? Math.round((cartTotal * taxRate) / 100) : 0;
 
     // Final Total Calculation (Items + Deposit + Admin + Tax)
-    const total = cartTotal + depositAmount + adminFee + taxAmount;
+    const discountedCartTotal = Math.max(0, cartTotal - referralDiscount);
+    const total = discountedCartTotal + depositAmount + adminFee + taxAmount;
     const remaining = total - amountPaid;
 
     const handleCheckout = async () => {
@@ -439,7 +489,8 @@ export default function POS() {
                         amount: amountPaid,
                         methodId: selectedPaymentMethod,
                         note: transactionType === 'BOOKING' ? 'Booking DP' : 'Direct Payment'
-                    }
+                    },
+                    referralCode: referralId ? referralCode : undefined
                 })
             });
 
@@ -784,11 +835,36 @@ export default function POS() {
                         </select>
                     </div>
 
+                    {/* Referral Code Field */}
+                    <div className="flex gap-2">
+                        <input
+                            type="text"
+                            placeholder={t('referral.code')}
+                            className="flex-1 p-1.5 text-xs border border-gray-200 rounded-lg outline-none focus:border-blue-500 uppercase font-mono"
+                            value={referralCode}
+                            onChange={(e) => setReferralCode(e.target.value)}
+                        />
+                        <button
+                            type="button"
+                            onClick={validateReferral}
+                            disabled={validatingReferral || !referralCode || cartTotal === 0}
+                            className="px-3 py-1.5 bg-blue-600 text-white rounded-lg text-[10px] font-bold hover:bg-blue-700 disabled:bg-gray-300"
+                        >
+                            {validatingReferral ? '...' : t('referral.validate')}
+                        </button>
+                    </div>
+
                     <div className="space-y-0.5">
                         <div className="flex justify-between items-center text-xs text-gray-500">
                             <span>Subtotal</span>
                             <span>Rp {cartTotal.toLocaleString()}</span>
                         </div>
+                        {referralDiscount > 0 && (
+                            <div className="flex justify-between items-center text-xs text-emerald-600 font-medium">
+                                <span>Referral Discount</span>
+                                <span>- Rp {referralDiscount.toLocaleString()}</span>
+                            </div>
+                        )}
                         {adminFee > 0 && (
                             <div className="flex justify-between items-center text-xs text-blue-600 font-medium">
                                 <span>{t('invoice.adminFee')}</span>
@@ -1140,6 +1216,31 @@ export default function POS() {
                                 Tutup
                             </button>
                         </div>
+                    </div>
+                </div>
+            )}
+            {/* Open Shift Modal */}
+            <OpenShiftModal
+                isOpen={isOpenShiftModalOpen}
+                onClose={() => setIsOpenShiftModalOpen(false)}
+            />
+
+            {/* Shift Locked Overlay */}
+            {!shiftLoading && !currentShift && (
+                <div className="fixed inset-0 z-50 bg-white/60 backdrop-blur-[1px] flex flex-col items-center justify-center p-6 text-center md:ml-64">
+                    <div className="bg-white p-8 rounded-3xl shadow-2xl border border-gray-100 max-w-sm animate-in fade-in zoom-in duration-300">
+                        <div className="w-20 h-20 bg-indigo-100 rounded-full flex items-center justify-center mx-auto mb-6 text-indigo-600">
+                            <Lock size={40} />
+                        </div>
+                        <h2 className="text-2xl font-black text-gray-900 mb-2">Kasir Terkunci</h2>
+                        <p className="text-gray-500 mb-8">Anda harus membuka shift baru sebelum dapat melakukan transaksi tunai di POS ini.</p>
+                        <button
+                            onClick={() => setIsOpenShiftModalOpen(true)}
+                            className="w-full bg-indigo-600 text-white font-bold py-4 rounded-2xl hover:bg-indigo-700 transition-all shadow-lg hover:shadow-indigo-200 flex items-center justify-center gap-2"
+                        >
+                            <Unlock size={20} />
+                            BUKA SHIFT SEKARANG
+                        </button>
                     </div>
                 </div>
             )}

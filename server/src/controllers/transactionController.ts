@@ -6,7 +6,7 @@ export const transactionController = {
     // Online Booking from Landing Page
     publicBook: async (req: Request, res: Response) => {
         try {
-            const { name, phone, email, pickupDate, returnPlanDate, items } = req.body;
+            const { name, phone, email, pickupDate, returnPlanDate, items, referralCode } = req.body;
 
             // 1. Validation
             if (!name || !phone || !email || !pickupDate || !returnPlanDate || !items || items.length === 0) {
@@ -81,6 +81,24 @@ export const transactionController = {
                 let totalAmount = 0;
                 const txItems = [];
 
+                // Referral Handling
+                let referralId: number | undefined;
+                let discountAmount = 0;
+                let commissionRate = 0;
+
+                if (referralCode && typeof referralCode === 'string') {
+                    const ref = await tx.referralCode.findUnique({
+                        where: { code: referralCode.toUpperCase(), isActive: true }
+                    });
+                    if (ref) {
+                        referralId = ref.id;
+                        commissionRate = ref.commissionRate;
+                        // We calculate discount later after we have total base amount
+                        discountAmount = ref.discountType === 'PERCENTAGE' ? -1 : ref.discountValue;
+                        // -1 is flag for percentage
+                    }
+                }
+
                 for (const sku of assignedSkus) {
                     const inst = await tx.itemInstance.findUnique({
                         where: { sku },
@@ -91,7 +109,18 @@ export const transactionController = {
                     txItems.push({ itemInstanceSku: sku, priceAtRental: inst.itemVariant.item.rentalPrice });
                 }
 
-                const transaction = await (tx.transaction as any).create({
+                // Finalize Discount
+                if (referralId) {
+                    const ref = await tx.referralCode.findUnique({ where: { id: referralId } });
+                    if (ref) {
+                        const calculatedDiscount = ref.discountType === 'PERCENTAGE'
+                            ? (ref.discountValue / 100) * totalAmount
+                            : ref.discountValue;
+                        totalAmount = Math.max(0, totalAmount - calculatedDiscount);
+                    }
+                }
+
+                const transaction = await tx.transaction.create({
                     data: {
                         customerId: customer.id,
                         pickupDate: reqStart,
@@ -100,9 +129,23 @@ export const transactionController = {
                         status: 'BOOKED',
                         paymentStatus: 'UNPAID',
                         source: 'ONLINE',
-                        items: { create: txItems }
+                        items: { create: txItems },
+                        referralCode: referralId ? { connect: { id: referralId } } : undefined
                     }
                 });
+
+                // Record Commission (Pending)
+                if (referralId) {
+                    const commissionAmount = (commissionRate / 100) * totalAmount;
+                    await tx.commissionLog.create({
+                        data: {
+                            referralCode: { connect: { id: referralId } },
+                            transaction: { connect: { id: transaction.id } },
+                            amount: commissionAmount,
+                            status: 'PENDING'
+                        }
+                    });
+                }
 
                 return transaction;
             });
@@ -137,7 +180,7 @@ export const transactionController = {
     createConfig: async (req: Request, res: Response) => {
         // Updated logic for Booking vs Immediate
         try {
-            const { type, customerId, pickupDate, returnPlanDate, items, payment, adminFee = 0, taxRate = 0, taxAmount = 0 } = req.body;
+            const { type, customerId, pickupDate, returnPlanDate, items, payment, adminFee = 0, taxRate = 0, taxAmount = 0, referralCode } = req.body;
 
             // 1. Gather all instance SKUs to be rented/reserved
             const assignedSkus: string[] = [];
@@ -242,6 +285,23 @@ export const transactionController = {
                     });
                 }
 
+                // --- Referral Discount Calculation ---
+                let referralId: number | undefined;
+                let commissionRate = 0;
+                if (referralCode && typeof referralCode === 'string') {
+                    const ref = await tx.referralCode.findUnique({
+                        where: { code: referralCode.toUpperCase(), isActive: true }
+                    });
+                    if (ref) {
+                        referralId = ref.id;
+                        commissionRate = ref.commissionRate;
+                        const calculatedDiscount = ref.discountType === 'PERCENTAGE'
+                            ? (ref.discountValue / 100) * totalAmount
+                            : ref.discountValue;
+                        totalAmount = Math.max(0, totalAmount - calculatedDiscount);
+                    }
+                }
+
                 // --- SaaS Fee Calculation ---
                 let calculatedSaasFee = 0;
                 let feeDetails = '';
@@ -277,6 +337,7 @@ export const transactionController = {
                         items: {
                             create: transactionItemsData
                         },
+                        referralCode: referralId ? { connect: { id: referralId } } : undefined
                     }
                 });
 
@@ -288,6 +349,19 @@ export const transactionController = {
                             amount: calculatedSaasFee,
                             chargedTo: saasChargedTo,
                             calculationDetails: feeDetails
+                        }
+                    });
+                }
+
+                // --- Log Commission ---
+                if (referralId && commissionRate > 0) {
+                    const commissionAmount = (commissionRate / 100) * totalAmount;
+                    await tx.commissionLog.create({
+                        data: {
+                            referralCode: { connect: { id: referralId } },
+                            transaction: { connect: { id: newTransaction.id } },
+                            amount: commissionAmount,
+                            status: 'PENDING'
                         }
                     });
                 }
@@ -325,12 +399,17 @@ export const transactionController = {
                         }
                     } else {
                         // Regular Manual Payment (Cash/Transfer)
+                        const activeShift = await tx.shift.findFirst({
+                            where: { userId: (req as any).user?.id, status: 'OPEN' }
+                        });
+
                         await tx.payment.create({
                             data: {
                                 transactionId: newTransaction.id,
                                 amount: payment.amount,
                                 paymentMethodId: payment.methodId,
-                                createdById: req.user?.id ?? null
+                                createdById: req.user?.id ?? null,
+                                shiftId: activeShift?.id
                             }
                         });
 
@@ -417,13 +496,18 @@ export const transactionController = {
                 }
 
                 // Regular manual payment
+                const activeShift = await tx.shift.findFirst({
+                    where: { userId: (req as any).user?.id, status: 'OPEN' }
+                });
+
                 await tx.payment.create({
                     data: {
                         transactionId: transaction.id,
                         amount: parseFloat(payment.amount),
                         paymentMethodId: payment.methodId,
                         note: payment.note || 'Manual Payment',
-                        createdById: req.user?.id ?? null
+                        createdById: req.user?.id ?? null,
+                        shiftId: activeShift?.id
                     }
                 });
 
@@ -517,12 +601,18 @@ export const transactionController = {
                     }
 
                     // Regular manual payment
+                    const activeShift = await tx.shift.findFirst({
+                        where: { userId: (req as any).user?.id, status: 'OPEN' }
+                    });
+
                     await tx.payment.create({
                         data: {
                             transactionId: transaction.id,
                             amount: parseFloat(payment.amount),
                             paymentMethodId: payment.methodId,
-                            note: payment.note || 'Pickup Payment'
+                            note: payment.note || 'Pickup Payment',
+                            createdById: req.user?.id ?? null,
+                            shiftId: activeShift?.id
                         }
                     });
                 }
@@ -654,12 +744,18 @@ export const transactionController = {
                 // b. Process Payment if any (Regular Manual)
                 let addedPayment = 0;
                 if (payment && payment.amount > 0) {
+                    const activeShift = await tx.shift.findFirst({
+                        where: { userId: (req as any).user?.id, status: 'OPEN' }
+                    });
+
                     await tx.payment.create({
                         data: {
                             transactionId: transaction.id,
                             amount: parseFloat(payment.amount),
                             paymentMethodId: payment.methodId,
-                            note: payment.note || 'Fine Payment'
+                            note: payment.note || 'Fine Payment',
+                            createdById: req.user?.id ?? null,
+                            shiftId: activeShift?.id
                         }
                     });
                     addedPayment = parseFloat(payment.amount);
@@ -760,7 +856,8 @@ export const transactionController = {
                     },
                     user: { select: { name: true, username: true } },
                     pickedUpBy: { select: { name: true, username: true } },
-                    returnedBy: { select: { name: true, username: true } }
+                    returnedBy: { select: { name: true, username: true } },
+                    referralCode: { include: { partner: true } }
                 }
             });
 

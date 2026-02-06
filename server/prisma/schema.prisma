@@ -27,6 +27,7 @@ model User {
   pickedUpTransactions Transaction[] @relation("PickedUpBy")
   returnedTransactions Transaction[] @relation("ReturnedBy")
   createdPayments      Payment[]
+  shifts               Shift[]
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 }
@@ -185,10 +186,14 @@ model Transaction {
   payments         Payment[]
   fines            Fine[]
   
+  referralCodeId   Int?
+  referralCode     ReferralCode?     @relation(fields: [referralCodeId], references: [id])
+
   createdAt        DateTime          @default(now())
   updatedAt        DateTime          @updatedAt
   note             String?
   saasFeeLog       SaaSFeeLog?
+  commissionLog    CommissionLog?    @relation("TransactionCommission")
 }
 
 model SaaSFeeLog {
@@ -201,6 +206,49 @@ model SaaSFeeLog {
     chargedTo       String      // "CUSTOMER" or "MERCHANT"
     
     createdAt       DateTime @default(now())
+}
+
+model ReferralPartner {
+  id        Int            @id @default(autoincrement())
+  name      String
+  phone     String?
+  email     String?
+  bankInfo  String?        // Bank name, Account number, Holder name
+  codes     ReferralCode[]
+  createdAt DateTime       @default(now())
+  updatedAt DateTime       @updatedAt
+}
+
+enum ReferralDiscountType {
+  PERCENTAGE
+  FIXED
+}
+
+model ReferralCode {
+  id               Int                  @id @default(autoincrement())
+  code             String               @unique // e.g. "PARTNER10"
+  partnerId        Int
+  partner          ReferralPartner      @relation(fields: [partnerId], references: [id])
+  discountType     ReferralDiscountType @default(PERCENTAGE)
+  discountValue    Float
+  commissionRate   Float                // Percentage e.g. 5 for 5%
+  isActive         Boolean              @default(true)
+  transactions     Transaction[]
+  commissionLogs   CommissionLog[]
+  createdAt        DateTime             @default(now())
+  updatedAt        DateTime             @updatedAt
+}
+
+model CommissionLog {
+  id              Int          @id @default(autoincrement())
+  referralCodeId  Int
+  referralCode    ReferralCode @relation(fields: [referralCodeId], references: [id])
+  transactionId   Int?         @unique
+  transaction     Transaction? @relation("TransactionCommission", fields: [transactionId], references: [id])
+  amount          Float        // Calculated commission amount
+  status          String       @default("PENDING") // PENDING, PAID
+  paidAt          DateTime?
+  createdAt       DateTime     @default(now())
 }
 
 model TransactionItem {
@@ -237,6 +285,8 @@ model Payment {
   note            String?
   createdById     Int?
   createdBy       User?         @relation(fields: [createdById], references: [id])
+  shiftId         Int?
+  shift           Shift?        @relation(fields: [shiftId], references: [id])
 }
 
 model ViolationType {
@@ -356,4 +406,20 @@ enum BroadcastStatus {
   SENT
   FAILED
   CANCELLED
+}
+
+model Shift {
+  id           Int       @id @default(autoincrement())
+  userId       Int
+  user         User      @relation(fields: [userId], references: [id])
+  startTime    DateTime  @default(now())
+  endTime      DateTime?
+  startCash    Float     @default(0)
+  expectedCash Float     @default(0) // Sum of cash payments during shift
+  actualCash   Float?    // Entered by user at close
+  variance     Float?    // expected - actual
+  status       String    @default("OPEN") // OPEN, CLOSED
+  notes        String?   @db.Text
+  payments     Payment[]
+  createdAt    DateTime  @default(now())
 }

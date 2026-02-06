@@ -14,3 +14,32 @@
   /* Gray 50 */
   color: #111827;
 }
+
+@media print {
+
+  .no-print,
+  nav,
+  sidebar,
+  aside,
+  button,
+  .fixed,
+  .absolute {
+    display: none !important;
+  }
+
+  body,
+  html {
+    background: white !important;
+    padding: 0 !important;
+    margin: 0 !important;
+  }
+
+  #printable-invoice {
+    display: block !important;
+    position: static !important;
+    width: 100% !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    box-shadow: none !important;
+  }
+}

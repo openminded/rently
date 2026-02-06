@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { TrendingUp, Users, ShoppingBag, AlertCircle, Calendar, Package, Activity } from 'lucide-react';
+import { TrendingUp, Users, ShoppingBag, AlertCircle, Calendar, Package, Activity, DollarSign, History } from 'lucide-react';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar, PieChart, Pie, Cell } from 'recharts';
 
 import { useAuth } from '../context/AuthContext';
@@ -158,7 +158,7 @@ export default function Dashboard() {
                 </div>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-6">
                 <StatCard
                     title={t('dashboard.stat.revenue')}
                     value={summary ? formatCurrency(summary.revenue) : '-'}
@@ -187,13 +187,33 @@ export default function Dashboard() {
                     icon={AlertCircle}
                     color="bg-rose-500"
                 />
+                <StatCard
+                    title="Total Commissions"
+                    value={summary?.referral ? formatCurrency(summary.referral.totalCommissions) : '-'}
+                    label="All referral payouts in period"
+                    icon={DollarSign}
+                    color="bg-amber-500"
+                />
+                <StatCard
+                    title="Pending Payouts"
+                    value={summary?.referral ? formatCurrency(summary.referral.pendingCommissions) : '-'}
+                    label="Outstanding commissions"
+                    icon={History}
+                    color="bg-slate-500"
+                />
             </div>
 
             {/* Charts Section */}
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-                {/* Revenue Chart */}
+                {/* Revenue & Commission Chart */}
                 <div className="lg:col-span-2 bg-white p-6 rounded-2xl border border-gray-100 shadow-sm min-h-[400px]">
-                    <h3 className="font-bold text-gray-900 mb-6">{t('dashboard.chart.revenue')}</h3>
+                    <div className="flex items-center justify-between mb-6">
+                        <h3 className="font-bold text-gray-900">{t('dashboard.chart.revenue')} & Commissions</h3>
+                        <div className="flex items-center gap-4 text-xs font-bold">
+                            <div className="flex items-center gap-1.5"><div className="w-3 h-3 bg-emerald-500 rounded-full" /> Revenue</div>
+                            <div className="flex items-center gap-1.5"><div className="w-3 h-3 bg-amber-500 rounded-full" /> Commissions</div>
+                        </div>
+                    </div>
                     {charts?.revenueTrend && (
                         <div className="h-[300px]">
                             <ResponsiveContainer width="100%" height="100%">
@@ -202,6 +222,10 @@ export default function Dashboard() {
                                         <linearGradient id="colorRev" x1="0" y1="0" x2="0" y2="1">
                                             <stop offset="5%" stopColor="#10b981" stopOpacity={0.1} />
                                             <stop offset="95%" stopColor="#10b981" stopOpacity={0} />
+                                        </linearGradient>
+                                        <linearGradient id="colorComm" x1="0" y1="0" x2="0" y2="1">
+                                            <stop offset="5%" stopColor="#f59e0b" stopOpacity={0.1} />
+                                            <stop offset="95%" stopColor="#f59e0b" stopOpacity={0} />
                                         </linearGradient>
                                     </defs>
                                     <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f3f4f6" />
@@ -219,7 +243,7 @@ export default function Dashboard() {
                                         tickLine={false}
                                     />
                                     <Tooltip
-                                        formatter={(val: any) => formatCurrency(val)}
+                                        formatter={(val: any, name?: string) => [formatCurrency(val), name === 'revenue' ? 'Revenue' : 'Commission']}
                                         labelFormatter={(label) => new Date(label).toLocaleDateString('id-ID', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
                                         contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
                                     />
@@ -230,6 +254,14 @@ export default function Dashboard() {
                                         strokeWidth={3}
                                         fillOpacity={1}
                                         fill="url(#colorRev)"
+                                    />
+                                    <Area
+                                        type="monotone"
+                                        dataKey="commission"
+                                        stroke="#f59e0b"
+                                        strokeWidth={3}
+                                        fillOpacity={1}
+                                        fill="url(#colorComm)"
                                     />
                                 </AreaChart>
                             </ResponsiveContainer>

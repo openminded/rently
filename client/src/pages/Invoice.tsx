@@ -57,8 +57,13 @@ export default function Invoice() {
         fetchSettings();
     }, [id, token]);
 
-    if (loading) return <div>{t('common.loading')}</div>;
-    if (!transaction) return <div>{t('common.noData')}</div>;
+    if (loading) return <div className="p-8 text-center">{t('common.loading')}</div>;
+    if (!transaction) return <div className="p-8 text-center">{t('common.noData')}</div>;
+
+    const itemsSubtotal = transaction.items.reduce((s: number, i: any) => s + i.priceAtRental, 0);
+    const finesSubtotal = transaction.fines?.reduce((s: number, f: any) => s + f.amount, 0) || 0;
+    const expectedTotal = itemsSubtotal + transaction.adminFee + transaction.taxAmount + finesSubtotal;
+    const discountAmount = Math.max(0, Math.round(expectedTotal - transaction.totalAmount));
 
     return (
         <div className="bg-gray-100 min-h-screen p-8 print:p-0 print:bg-white flex flex-col items-center">
@@ -92,7 +97,7 @@ export default function Invoice() {
                     {/* Header */}
                     <div className="flex justify-between items-start mb-10 border-b pb-8">
                         <div>
-                            <h1 className="text-3xl font-bold text-gray-900 mb-2">{settings.BRAND_NAME || 'RUMAH DINAR'}</h1>
+                            <h1 className="text-3xl font-bold text-gray-900 mb-2">{settings.BRAND_NAME || 'WERENTLY'}</h1>
                             <p className="text-gray-500 text-sm">{settings.BRAND_TAGLINE || 'Sewa Baju & Perlengkapan Pesta'}</p>
                             <p className="text-gray-500 text-sm whitespace-pre-line">{settings.BRAND_ADDRESS || 'Jln. Contoh No. 123, Kota Bandung'}</p>
                             <p className="text-gray-500 text-sm">WA: {settings.BRAND_WA || '0812-3456-7890'}</p>
@@ -212,22 +217,40 @@ export default function Invoice() {
 
                     {/* SECTION 3: GRAND TOTAL SUMMARY */}
                     <div className="flex justify-end mb-8">
-                        <div className="w-64 bg-gray-50 p-4 rounded-lg">
-                            {transaction.adminFee > 0 && (
-                                <div className="flex justify-between text-sm text-blue-600 font-medium mb-1">
-                                    <span>{t('invoice.adminFee')}</span>
-                                    <span>Rp {transaction.adminFee.toLocaleString()}</span>
+                        <div className="w-80 bg-gray-50 p-5 rounded-xl border border-gray-100 shadow-sm">
+                            <div className="space-y-2 mb-4">
+                                <div className="flex justify-between text-sm text-gray-500">
+                                    <span>{t('invoice.subtotal.rental')}</span>
+                                    <span>Rp {itemsSubtotal.toLocaleString()}</span>
                                 </div>
-                            )}
-                            {transaction.taxAmount > 0 && (
-                                <div className="flex justify-between text-sm text-green-600 font-medium mb-1">
-                                    <span>Pajak ({transaction.taxRate}%)</span>
-                                    <span>Rp {transaction.taxAmount.toLocaleString()}</span>
-                                </div>
-                            )}
-                            <div className="flex justify-between text-lg font-black border-b border-gray-200 pb-2 mb-2">
-                                <span>{t('invoice.grandTotal')}</span>
-                                <span>Rp {transaction.totalAmount.toLocaleString()}</span>
+                                {transaction.adminFee > 0 && (
+                                    <div className="flex justify-between text-sm text-blue-600 font-medium">
+                                        <span>{t('invoice.adminFee')}</span>
+                                        <span>Rp {transaction.adminFee.toLocaleString()}</span>
+                                    </div>
+                                )}
+                                {transaction.taxAmount > 0 && (
+                                    <div className="flex justify-between text-sm text-green-600 font-medium">
+                                        <span>Pajak ({transaction.taxRate}%)</span>
+                                        <span>Rp {transaction.taxAmount.toLocaleString()}</span>
+                                    </div>
+                                )}
+                                {finesSubtotal > 0 && (
+                                    <div className="flex justify-between text-sm text-red-600 font-medium">
+                                        <span>{t('invoice.subtotal.fines')}</span>
+                                        <span>Rp {finesSubtotal.toLocaleString()}</span>
+                                    </div>
+                                )}
+                                {discountAmount > 0 && (
+                                    <div className="flex justify-between text-sm text-pink-600 font-bold bg-pink-50 px-2 py-1 rounded">
+                                        <span>{t('referral.discount')}</span>
+                                        <span>- Rp {discountAmount.toLocaleString()}</span>
+                                    </div>
+                                )}
+                            </div>
+                            <div className="flex justify-between items-center pt-3 border-t-2 border-dashed border-gray-200">
+                                <span className="text-sm font-bold text-gray-400 uppercase tracking-wider">{t('invoice.grandTotal')}</span>
+                                <span className="text-xl font-black text-gray-900">Rp {transaction.totalAmount.toLocaleString()}</span>
                             </div>
                         </div>
                     </div>
@@ -284,7 +307,7 @@ export default function Invoice() {
                     {/* Footer */}
                     <div className="border-t pt-8 text-center text-xs text-gray-400">
                         <p>{t('invoice.thankYou', { brand: settings.BRAND_NAME || 'Werently' })}</p>
-                        <p className="mt-1">{t('invoice.followUs', { social: settings.BRAND_SOCIAL || '@rumahdinar' })}</p>
+                        <p className="mt-1">{t('invoice.followUs', { social: settings.BRAND_SOCIAL || '@werently' })}</p>
                     </div>
                 </div>
             )}
@@ -293,7 +316,7 @@ export default function Invoice() {
             {isThermal && (
                 <div className="bg-white w-[58mm] p-2 shadow-xl print:shadow-none print:w-full font-mono text-[10px] leading-tight">
                     <div className="text-center mb-4 border-b border-dashed border-black pb-2">
-                        <h1 className="font-bold text-baset mb-1">{settings.BRAND_NAME || 'RUMAH DINAR'}</h1>
+                        <h1 className="font-bold text-baset mb-1">{settings.BRAND_NAME || 'WERENTLY'}</h1>
                         <p>{settings.BRAND_TAGLINE || 'Sewa Baju Pesta'}</p>
                         <p>{settings.BRAND_WA || '0812-3456-7890'}</p>
                         <p className="mt-2 text-[9px]">{new Date(transaction.createdAt).toLocaleString()}</p>
@@ -336,21 +359,37 @@ export default function Invoice() {
                     )}
 
                     {/* TOTALS */}
-                    <div className="border-t border-black pt-1 mt-2">
+                    <div className="border-t border-black pt-1 mt-2 space-y-0.5">
+                        <div className="flex justify-between">
+                            <span>SUBTOTAL</span>
+                            <span>{itemsSubtotal.toLocaleString()}</span>
+                        </div>
                         {transaction.adminFee > 0 && (
-                            <div className="flex justify-between mb-0.5">
+                            <div className="flex justify-between">
                                 <span>{t('invoice.adminFee')}</span>
                                 <span>{transaction.adminFee.toLocaleString()}</span>
                             </div>
                         )}
                         {transaction.taxAmount > 0 && (
-                            <div className="flex justify-between mb-0.5">
+                            <div className="flex justify-between">
                                 <span>PPN ({transaction.taxRate}%)</span>
                                 <span>{transaction.taxAmount.toLocaleString()}</span>
                             </div>
                         )}
-                        <div className="flex justify-between font-bold text-xs mt-1">
-                            <span>{t('invoice.grandTotal')}</span>
+                        {finesSubtotal > 0 && (
+                            <div className="flex justify-between">
+                                <span>FINES</span>
+                                <span>{finesSubtotal.toLocaleString()}</span>
+                            </div>
+                        )}
+                        {discountAmount > 0 && (
+                            <div className="flex justify-between font-bold">
+                                <span>DISCOUNT</span>
+                                <span>-{discountAmount.toLocaleString()}</span>
+                            </div>
+                        )}
+                        <div className="flex justify-between font-bold text-xs border-t border-black pt-1 mt-1">
+                            <span>TOTAL</span>
                             <span>{transaction.totalAmount.toLocaleString()}</span>
                         </div>
                     </div>

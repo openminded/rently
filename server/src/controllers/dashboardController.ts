@@ -90,6 +90,20 @@ export const dashboardController = {
                 return !instances.some(i => i.status === 'AVAILABLE');
             }).length;
 
+            // 7. Referral Commission Stats
+            const commissions = await prisma.commissionLog.aggregate({
+                _sum: { amount: true },
+                where: dateFilter
+            });
+
+            const pendingCommissions = await prisma.commissionLog.aggregate({
+                _sum: { amount: true },
+                where: {
+                    ...dateFilter,
+                    status: 'PENDING'
+                }
+            });
+
             res.json({
                 revenue: payments._sum.amount || 0,
                 activeRentals,
@@ -103,6 +117,10 @@ export const dashboardController = {
                     rentedUnits,
                     outOfStockItems,
                     availabilityRate: totalUnits > 0 ? (availableUnits / totalUnits) * 100 : 0
+                },
+                referral: {
+                    totalCommissions: commissions._sum.amount || 0,
+                    pendingCommissions: pendingCommissions._sum.amount || 0
                 }
             });
 
@@ -209,8 +227,28 @@ export const dashboardController = {
                     .sort((a, b) => b.revenue - a.revenue);
             }
 
+            // Commission Trend
+            const commissionLogs = await prisma.commissionLog.findMany({
+                where: {
+                    createdAt: { gte: start, lte: end }
+                },
+                select: { createdAt: true, amount: true }
+            });
+
+            const commissionMap = new Map<string, number>();
+            commissionLogs.forEach(c => {
+                const day = c.createdAt.toISOString().split('T')[0] as string;
+                commissionMap.set(day, (commissionMap.get(day) || 0) + c.amount);
+            });
+
+            // Add commission to trend data
+            const trendWithComms = chartData.map(d => ({
+                ...d,
+                commission: commissionMap.get(d.date) || 0
+            }));
+
             res.json({
-                revenueTrend: chartData,
+                revenueTrend: trendWithComms,
                 topItems,
                 cashierPerformance
             });

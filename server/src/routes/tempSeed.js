@@ -46,13 +46,13 @@ router.get('/', async (req, res) => {
             { key: 'LANDING_HOWTO_STEP_4_TITLE', value: 'Kembalikan' },
             { key: 'LANDING_HOWTO_STEP_4_DESC', value: 'Kembalikan H+1. Tidak perlu dicuci, kami yang urus laundry.' },
             // ABOUT US
-            { key: 'LANDING_ABOUT_TITLE', value: 'Tentang Rumah Dinar' },
-            { key: 'LANDING_ABOUT_DESC', value: 'Rumah Dinar hadir untuk menjawab kebutuhan fashion premium tanpa harus membeli. Kami percaya bahwa setiap orang berhak tampil istimewa di momen spesial mereka dengan busana berkualitas tinggi, bersih, dan wangi.' },
+            { key: 'LANDING_ABOUT_TITLE', value: 'Tentang Werently' },
+            { key: 'LANDING_ABOUT_DESC', value: 'Werently hadir untuk menjawab kebutuhan fashion premium tanpa harus membeli. Kami percaya bahwa setiap orang berhak tampil istimewa di momen spesial mereka dengan busana berkualitas tinggi, bersih, dan wangi.' },
             { key: 'LANDING_ABOUT_IMAGE', value: '/feature_sq.png' },
             // CONTACT
             { key: 'LANDING_CONTACT_TITLE', value: 'Hubungi Kami' },
             { key: 'LANDING_CONTACT_ADDRESS', value: 'Jl. Ahmad Yani No. 123, Surabaya, Jawa Timur' },
-            { key: 'LANDING_CONTACT_EMAIL', value: 'hello@rumahdinar.com' },
+            { key: 'LANDING_CONTACT_EMAIL', value: 'hello@werently.com' },
             { key: 'LANDING_CONTACT_PHONE', value: '+62 812-3456-7890' },
             { key: 'LANDING_CONTACT_MAP', value: 'https://www.google.com/maps/embed?pb=...' },
             // CONTACT & FOOTER

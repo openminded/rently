@@ -5,11 +5,16 @@ import { clsx } from 'clsx';
 import { useAuth } from '../context/AuthContext';
 import { useBrand } from '../hooks/useBrand';
 import { useLanguage } from '../context/LanguageContext';
+import { useShift } from '../context/ShiftContext';
+import { CloseShiftModal } from './ShiftModal';
+import { Lock } from 'lucide-react';
 
 export default function Layout() {
     const location = useLocation();
     const { user, logout, hasRole } = useAuth();
     const { t } = useLanguage();
+    const { currentShift } = useShift();
+    const [isCloseShiftOpen, setIsCloseShiftOpen] = useState(false);
 
     // State for Mobile and Desktop sidebars
     const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -20,7 +25,8 @@ export default function Layout() {
         transactions: true,
         inventory: true,
         settings: false,
-        broadcast: true
+        broadcast: true,
+        referral: false
     });
 
     const toggleGroup = (group: keyof typeof openGroups) => {
@@ -28,6 +34,7 @@ export default function Layout() {
     };
 
     const isMasterActive = location.pathname.startsWith('/app/masters');
+    const isReferralActive = location.pathname.startsWith('/app/referral');
     const isTransactionActive = location.pathname.startsWith('/app/transactions');
     const isInventoryActive = location.pathname.startsWith('/app/inventory');
 
@@ -162,10 +169,39 @@ export default function Layout() {
 
                     {/* Finance Menu */}
                     {hasRole(['SUPERADMIN', 'OWNER']) && (
-                        <NavLink to="/app/finance" onClick={() => setMobileMenuOpen(false)} className={({ isActive }) => clsx("flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors mt-2", isActive ? "bg-emerald-600 text-white" : "text-gray-500 hover:bg-gray-100 hover:text-gray-900")}>
-                            <DollarSign size={18} /> {t('menu.finance')}
-                        </NavLink>
+                        <>
+                            <NavLink to="/app/finance" onClick={() => setMobileMenuOpen(false)} className={({ isActive }) => clsx("flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors mt-2", isActive ? "bg-emerald-600 text-white" : "text-gray-500 hover:bg-gray-100 hover:text-gray-900")}>
+                                <DollarSign size={18} /> {t('menu.finance')}
+                            </NavLink>
+                            <NavLink to="/app/shifts" onClick={() => setMobileMenuOpen(false)} className={({ isActive }) => clsx("flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors mt-1", isActive ? "bg-indigo-600 text-white" : "text-gray-500 hover:bg-gray-100 hover:text-gray-900")}>
+                                <Lock size={18} /> Shifts
+                            </NavLink>
+                        </>
                     )}
+
+                    {/* Referral & Commission Menu */}
+                    <div className="pt-2">
+                        <button
+                            onClick={() => toggleGroup('referral')}
+                            className={clsx("w-full flex items-center justify-between px-3 py-2.5 rounded-lg text-sm font-medium transition-colors", isReferralActive ? "text-gray-900 bg-gray-50" : "text-gray-500 hover:bg-gray-100")}
+                        >
+                            <div className="flex items-center gap-3">
+                                <MessageSquare size={18} /> {t('referral.title')}
+                            </div>
+                            <ChevronDown size={14} className={clsx("transition-transform", openGroups.referral ? "rotate-180" : "")} />
+                        </button>
+
+                        {openGroups.referral && (
+                            <div className="pl-10 space-y-1 mt-1">
+                                <NavLink to="/app/referral" end onClick={() => setMobileMenuOpen(false)} className={({ isActive }) => clsx("block py-1.5 text-sm transition-colors", isActive ? "text-blue-600 font-medium" : "text-gray-500 hover:text-gray-900")}>
+                                    {t('referral.management')}
+                                </NavLink>
+                                <NavLink to="/app/referral/history" onClick={() => setMobileMenuOpen(false)} className={({ isActive }) => clsx("block py-1.5 text-sm transition-colors", isActive ? "text-blue-600 font-medium" : "text-gray-500 hover:text-gray-900")}>
+                                    {t('referral.history')}
+                                </NavLink>
+                            </div>
+                        )}
+                    </div>
 
                     {/* User Management Menu (Owner, Superadmin, Supervisor) */}
                     {hasRole(['SUPERADMIN', 'OWNER', 'SUPERVISOR']) && (
@@ -293,6 +329,34 @@ export default function Layout() {
 
                 {/* User Footer */}
                 <div className="p-4 border-t border-gray-100">
+                    {/* Shift Status */}
+                    {currentShift ? (
+                        <div className="bg-indigo-50 p-3 rounded-xl mb-3 border border-indigo-100 animate-in fade-in slide-in-from-bottom-2 duration-300">
+                            <div className="flex justify-between items-center mb-1">
+                                <p className="text-[10px] font-black text-indigo-600 uppercase tracking-wider">Shift Aktif</p>
+                                <span className="flex h-2 w-2 relative">
+                                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
+                                    <span className="relative inline-flex rounded-full h-2 w-2 bg-green-500"></span>
+                                </span>
+                            </div>
+                            <p className="text-sm font-bold text-indigo-900">Rp {currentShift.expectedCash.toLocaleString()}</p>
+                            <button
+                                onClick={() => setIsCloseShiftOpen(true)}
+                                className="w-full mt-2 py-1.5 text-[10px] font-bold bg-white text-indigo-600 border border-indigo-200 rounded-lg hover:bg-indigo-600 hover:text-white transition-all shadow-sm"
+                            >
+                                TUTUP SHIFT
+                            </button>
+                        </div>
+                    ) : (
+                        <div className="bg-gray-50 p-3 rounded-xl mb-3 border border-gray-200 border-dashed">
+                            <div className="flex justify-between items-center mb-1">
+                                <p className="text-[10px] font-black text-gray-400 uppercase">Tidak Ada Shift</p>
+                                <span className="w-2 h-2 bg-gray-300 rounded-full" />
+                            </div>
+                            <p className="text-[10px] italic text-gray-400 leading-tight">Buka shift di menu POS untuk mulai transaksi tunai.</p>
+                        </div>
+                    )}
+
                     <div className="flex items-center gap-3 mb-3">
                         <div className="w-10 h-10 rounded-full bg-gray-100 flex items-center justify-center">
                             <User size={20} className="text-gray-500" />
@@ -331,6 +395,11 @@ export default function Layout() {
                 </button>
                 <Outlet />
             </main>
+
+            <CloseShiftModal
+                isOpen={isCloseShiftOpen}
+                onClose={() => setIsCloseShiftOpen(false)}
+            />
         </div>
     );
 }

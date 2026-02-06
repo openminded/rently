@@ -260,11 +260,11 @@ async function main() {
     const templates = [
         {
             name: 'Reminder Pickup',
-            content: 'Halo {{name}}, \n\nPesanan Anda di Rumah Dinar sudah siap diambil hari ini. \nSilakan datang ke store kami untuk pengambilan.\n\nTerima kasih!'
+            content: 'Halo {{name}}, \n\nPesanan Anda di Werently sudah siap diambil hari ini. \nSilakan datang ke store kami untuk pengambilan.\n\nTerima kasih!'
         },
         {
             name: 'Reminder Return',
-            content: 'Halo {{name}}, \n\nHari ini adalah jadwal pengembalian sewa Anda di Rumah Dinar. \nMohon kembalikan tepat waktu untuk menghindari denda keterlambatan.\n\nTerima kasih!'
+            content: 'Halo {{name}}, \n\nHari ini adalah jadwal pengembalian sewa Anda di Werently. \nMohon kembalikan tepat waktu untuk menghindari denda keterlambatan.\n\nTerima kasih!'
         }
     ];
     for (const t of templates) {
@@ -279,10 +279,10 @@ async function main() {
 }
 main()
     .catch((e) => {
-    console.error(e);
-    process.exit(1);
-})
+        console.error(e);
+        process.exit(1);
+    })
     .finally(async () => {
-    await prisma.$disconnect();
-});
+        await prisma.$disconnect();
+    });
 //# sourceMappingURL=seed.js.map

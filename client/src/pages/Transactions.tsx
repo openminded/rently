@@ -896,6 +896,8 @@ export default function Transactions({ type: initialType }: TransactionsProps) {
                     columns={columns}
                     searchKeys={[]} // Disabled internal search
                     hideSearch={true} // Custom search above
+                    hideHeader={true}
+                    noCard={true}
                     actions={actionColumn}
                 />
             </div>

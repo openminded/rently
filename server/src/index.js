@@ -30,7 +30,7 @@ whatsappService.init().catch((err) => console.error('Failed to init WhatsApp:', 
 initBroadcastJob();
 // initReminderJob(); // Disabled per user request (Manual Trigger only)
 app.get('/', (req, res) => {
-    res.send('Rumah Dinar POS API is running');
+    res.send('Werently POS API is running');
 });
 // Global Fallback to debug 404s
 app.use((req, res) => {

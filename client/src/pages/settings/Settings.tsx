@@ -98,7 +98,7 @@ export default function Settings() {
                         value={settings.BRAND_NAME}
                         onChange={handleChange}
                         className="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
-                        placeholder="e.g., RUMAH DINAR"
+                        placeholder="e.g., WERENTLY"
                     />
                 </div>
 

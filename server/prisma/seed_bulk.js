@@ -39,7 +39,7 @@ async function main() {
         const c = await prisma.category.upsert({ where: { name }, update: {}, create: { name } });
         categories.push(c);
     }
-    const brandNames = ['Zara', 'H&M', 'Uniqlo', 'Batik Keris', 'Executive', 'Local Pride', 'Designer A', 'Designer B', 'Rumah Dinar', 'Tailor X'];
+    const brandNames = ['Zara', 'H&M', 'Uniqlo', 'Batik Keris', 'Executive', 'Local Pride', 'Designer A', 'Designer B', 'Werently', 'Tailor X'];
     const brands = [];
     for (const name of brandNames) {
         const b = await prisma.brand.upsert({ where: { name }, update: {}, create: { name } });

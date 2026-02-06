@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { ArrowRight, Check, Play, LayoutDashboard, MessageSquare, Calendar, ShieldCheck, BarChart3, Users, Globe, ShoppingCart, RotateCcw, TrendingUp, Smartphone, CreditCard, X, Maximize2 } from 'lucide-react';
+import { ArrowRight, Check, Play, LayoutDashboard, MessageSquare, Calendar, ShieldCheck, BarChart3, Users, Globe, ShoppingCart, RotateCcw, TrendingUp, Smartphone, CreditCard, X, Maximize2, Calculator, Ticket } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
 const TRANSLATIONS = {
@@ -89,11 +89,11 @@ const TRANSLATIONS = {
                     tag: "Finance"
                 },
                 {
-                    title: "Integrated Growth Tools (CRM)",
-                    problem: "Ignoring past customers makes acquiring new ones 5x more expensive and inefficient.",
-                    solution: "Built-in CRM to automate WhatsApp follow-ups and targeted loyalty promotions.",
-                    highlight: "Increased repeat orders.",
-                    tag: "Growth"
+                    title: "Referral & Commission System",
+                    problem: "Acquiring new customers through ads is expensive and often has low conversion rates.",
+                    solution: "Turn your customers into brand advocates with a robust referral system and automated payouts.",
+                    highlight: "Scalable organic growth.",
+                    tag: "Referral"
                 },
                 {
                     title: "Verified QRIS Integration",
@@ -128,7 +128,7 @@ const TRANSLATIONS = {
                 {
                     name: 'Pro',
                     desc: 'For high-volume rental businesses needing automation.',
-                    features: ['Unlimited Items', 'Hyper-fast POS Terminal', 'Integrated CRM & WhatsApp', 'Auto-restock Laundry Flow', 'Advanced 360° Analytics & Finance', 'Multi-User Access'],
+                    features: ['Unlimited Items', 'Hyper-fast POS Terminal', 'Referral & Commission System', 'Auto-restock Laundry Flow', 'Advanced 360° Analytics & Finance', 'Multi-User Access'],
                     cta: "Upgrade to Pro"
                 },
                 {
@@ -238,11 +238,11 @@ const TRANSLATIONS = {
                     tag: "Keuangan"
                 },
                 {
-                    title: "Tools Pertumbuhan (CRM)",
-                    problem: "Abaikan pelanggan lama bikin biaya iklan 5x lebih mahal untuk cari pelanggan baru.",
-                    solution: "CRM bawaan untuk automasi follow-up WhatsApp dan promo loyalitas tertarget.",
-                    highlight: "Repeat order meningkat.",
-                    tag: "Growth"
+                    title: "Sistem Referral & Komisi",
+                    problem: "Biaya iklan semakin mahal dan sulit mendapatkan pelanggan baru yang loyal.",
+                    solution: "Ubah pelanggan jadi marketing Anda dengan sistem referral otomatis dan pencairan komisi transparan.",
+                    highlight: "Pertumbuhan organik eksponensial.",
+                    tag: "Referral"
                 },
                 {
                     title: "Integrasi QRIS Terverifikasi",
@@ -277,7 +277,7 @@ const TRANSLATIONS = {
                 {
                     name: 'Pro',
                     desc: 'Untuk bisnis sewa aktif yang butuh kecepatan dan efisiensi.',
-                    features: ['Jumlah Barang Tanpa Batas', 'Terminal Kasir POS Kilat', 'Laporan Keuangan Standar', 'CRM & WhatsApp Terintegrasi', 'Alur Laundry Otomatis', 'Dashboard Analitik 360°'],
+                    features: ['Jumlah Barang Tanpa Batas', 'Terminal Kasir POS Kilat', 'Laporan Keuangan Standar', 'Sistem Referral & Komisi', 'Alur Laundry Otomatis', 'Dashboard Analitik 360°'],
                     cta: "Pilih Paket Pro"
                 },
                 {
@@ -307,6 +307,8 @@ export default function WerentlyLanding() {
     const navigate = useNavigate();
     const [lang, setLang] = useState<'en' | 'id'>('id');
     const [previewImage, setPreviewImage] = useState<string | null>(null);
+    const [simTransactions, setSimTransactions] = useState(50);
+    const [simPrice, setSimPrice] = useState(1000000);
 
     useEffect(() => {
         // Auto-detect language
@@ -346,7 +348,7 @@ export default function WerentlyLanding() {
         <ShieldCheck size={24} strokeWidth={1.5} />,
         <RotateCcw size={24} strokeWidth={1.5} />,
         <TrendingUp size={24} strokeWidth={1.5} />,
-        <Users size={24} strokeWidth={1.5} />,
+        <Ticket size={24} strokeWidth={1.5} />,
         <Smartphone size={24} strokeWidth={1.5} />
     ];
 
@@ -828,6 +830,119 @@ export default function WerentlyLanding() {
                             </button>
                         </div>
                     ))}
+                </div>
+
+                {/* Pricing Simulator Section */}
+                <div className="mt-24 bg-slate-50 rounded-[3rem] p-8 md:p-16 border border-slate-100 max-w-5xl mx-auto shadow-inner relative overflow-hidden">
+                    <div className="absolute top-0 right-0 p-8 opacity-5 text-indigo-600">
+                        <TrendingUp size={300} />
+                    </div>
+
+                    <div className="relative z-10 grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
+                        <div>
+                            <div className="inline-flex items-center gap-2 px-3 py-1 bg-indigo-100 text-indigo-700 rounded-full text-[10px] font-bold uppercase tracking-widest mb-4">
+                                <TrendingUp size={12} /> Mitra Tumbuh Bisnis
+                            </div>
+                            <h3 className="text-3xl lg:text-5xl font-black text-slate-900 mb-6 tracking-tighter leading-tight">
+                                {lang === 'id' ? 'Hitung Investasi Sukses Anda' : 'Calculate Your Success Investment'}
+                            </h3>
+                            <p className="text-lg text-slate-500 mb-10 font-medium leading-relaxed">
+                                {lang === 'id'
+                                    ? 'Werently hadir sebagai partner, bukan beban. Biaya sistem kami sangat adil—hanya menyesuaikan dengan keramaian bisnis Anda.'
+                                    : 'Werently acts as a partner, not a burden. Our system investment is fair—adjusting only to the volume of your business.'}
+                            </p>
+
+                            <div className="space-y-12">
+                                <div>
+                                    <div className="flex justify-between mb-4 items-end">
+                                        <label className="text-xs font-black text-slate-400 uppercase tracking-widest">
+                                            {lang === 'id' ? 'Target Pesanan / Bulan' : 'Monthly Order Target'}
+                                        </label>
+                                        <div className="flex items-baseline gap-1">
+                                            <span className="text-indigo-600 font-black text-4xl tracking-tighter">{simTransactions}</span>
+                                            <span className="text-slate-400 text-xs font-bold uppercase">{lang === 'id' ? 'Sewa' : 'Rentals'}</span>
+                                        </div>
+                                    </div>
+                                    <input
+                                        type="range" min="10" max="500" step="10"
+                                        value={simTransactions}
+                                        onChange={(e) => setSimTransactions(parseInt(e.target.value))}
+                                        className="w-full h-2.5 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-indigo-600"
+                                    />
+                                    <div className="flex justify-between mt-3 text-[10px] font-bold text-slate-400 uppercase tracking-widest">
+                                        <span>Mulai Kecil</span>
+                                        <span>Skala Besar</span>
+                                    </div>
+                                </div>
+
+                                <div>
+                                    <div className="flex justify-between mb-4 items-end">
+                                        <label className="text-xs font-black text-slate-400 uppercase tracking-widest">
+                                            {lang === 'id' ? 'Harga Sewa Per Item' : 'Rental Price Per Item'}
+                                        </label>
+                                        <div className="flex items-baseline gap-1">
+                                            <span className="text-indigo-600 font-black text-4xl tracking-tighter">Rp {(simPrice / 1000).toLocaleString('id-ID')}k</span>
+                                        </div>
+                                    </div>
+                                    <input
+                                        type="range" min="100000" max="5000000" step="100000"
+                                        value={simPrice}
+                                        onChange={(e) => setSimPrice(parseInt(e.target.value))}
+                                        className="w-full h-2.5 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-indigo-600"
+                                    />
+                                </div>
+                            </div>
+                        </div>
+
+                        <div className="bg-white rounded-[3rem] p-8 lg:p-12 shadow-[0_48px_80px_-16px_rgba(79,70,229,0.18)] border border-indigo-50 relative">
+                            <div className="absolute -top-5 -right-5 bg-gradient-to-r from-yellow-400 to-amber-500 text-amber-950 px-6 py-2.5 rounded-2xl text-xs font-black uppercase tracking-widest shadow-2xl rotate-3 border-4 border-white">
+                                Recommended Plan
+                            </div>
+
+                            <div className="mb-10 pb-10 border-b border-slate-100">
+                                <div className="text-slate-400 text-[10px] font-black uppercase tracking-widest mb-5 flex items-center gap-2">
+                                    <div className="w-2 h-2 bg-indigo-600 rounded-full animate-ping"></div>
+                                    Total Investasi Sistem Pintar
+                                </div>
+                                <div className="text-4xl lg:text-7xl font-black text-indigo-600 tracking-tighter flex items-baseline gap-2">
+                                    Rp {(
+                                        (simTransactions <= 100 ? 150000 : simTransactions <= 300 ? 300000 : 500000) +
+                                        (simTransactions * 7500)
+                                    ).toLocaleString('id-ID')}
+                                    <span className="text-xs text-slate-400 font-bold uppercase tracking-widest">/ bln</span>
+                                </div>
+                            </div>
+
+                            <div className="space-y-6 mb-12">
+                                <div className="flex justify-between items-center text-sm">
+                                    <span className="text-slate-500 font-medium">{lang === 'id' ? 'Biaya Pemeliharaan Sistem' : 'System Maintenance'}</span>
+                                    <span className="font-bold text-slate-900 bg-slate-50 px-4 py-2 rounded-xl text-xs">
+                                        Rp {(simTransactions <= 100 ? 150000 : simTransactions <= 300 ? 300000 : 500000).toLocaleString('id-ID')}
+                                    </span>
+                                </div>
+                                <div className="flex justify-between items-center text-sm">
+                                    <span className="text-slate-500 font-medium">{lang === 'id' ? `Kontribusi Operasional (${simTransactions} Transaksi)` : `Operational Contribution (${simTransactions} Tx)`}</span>
+                                    <span className="font-bold text-slate-900 bg-slate-50 px-4 py-2 rounded-xl text-xs">Rp {(simTransactions * 7500).toLocaleString('id-ID')}</span>
+                                </div>
+                                <div className="pt-8 mt-8 border-t border-slate-50 bg-emerald-50/30 -mx-8 lg:-mx-12 px-8 lg:px-12 pb-2 rounded-b-[2rem]">
+                                    <div className="flex justify-between items-center mb-2">
+                                        <span className="text-emerald-700 font-bold text-[10px] uppercase tracking-widest">Estimasi Omzet Bisnis</span>
+                                        <span className="text-emerald-700 font-black text-2xl tracking-tighter">Rp {(simTransactions * simPrice).toLocaleString('id-ID')}</span>
+                                    </div>
+                                    <div className="inline-flex items-center gap-2 px-3 py-1.5 bg-emerald-100 text-emerald-800 rounded-full text-[10px] font-black uppercase tracking-tight shadow-sm">
+                                        INVESTASI SISTEM HANYA ~{(
+                                            (((simTransactions <= 100 ? 150000 : simTransactions <= 300 ? 300000 : 500000) + (simTransactions * 7500)) / (simTransactions * simPrice)) * 100
+                                        ).toFixed(2)}% DARI TOTAL OMZET
+                                    </div>
+                                </div>
+                            </div>
+
+                            <button onClick={() => handleWhatsAppCTA('Pro')} className="group w-full py-6 bg-indigo-600 text-white rounded-[1.8rem] font-black uppercase tracking-widest hover:bg-indigo-700 transition-all shadow-[0_20px_40px_-10px_rgba(79,70,229,0.4)] hover:-translate-y-1.5 active:scale-95 flex items-center justify-center gap-3">
+                                {lang === 'id' ? 'Mulai Kerja Sama' : 'Start Partnership Now'}
+                                <ArrowRight size={22} className="group-hover:translate-x-1.5 transition-transform" />
+                            </button>
+                        </div>
+                    </div>
                 </div>
             </section>
 

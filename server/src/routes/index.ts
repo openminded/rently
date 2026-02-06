@@ -11,6 +11,7 @@ import returnRoutes from './returnRoutes.js';
 import settingsRoutes from './settingsRoutes.js';
 import authRoutes from './authRoutes.js';
 import { authenticateToken } from '../middleware/authMiddleware.js';
+import shiftRoutes from './shiftRoutes.js';
 
 const router = Router();
 
@@ -76,29 +77,8 @@ router.use('/inventory', authenticateToken, laundryRoutes); // Wait, inventory l
 // import transactionRoutes from './transactionRoutes.js';
 // ...
 
-// Correct mapping based on imports:
-router.use('/masters', masterRoutes);
-router.use('/items', itemRoutes);
-router.use('/transactions', authenticateToken, transactionRoutes);
-router.use('/dashboard', authenticateToken, dashboardRoutes);
-router.use('/laundry', authenticateToken, laundryRoutes);
-router.use('/laundry-partners', authenticateToken, laundryPartnerRoutes);
-router.use('/broadcast', authenticateToken, authRoutes); // Wait, broadcast is usually separate. No broadcastRoutes imported? 
-// Checking imports again from view_file:
-// import settingsRoutes from './settingsRoutes.js'; 
-// import authRoutes from './authRoutes.js';
-// There is NO broadcastRoutes imported in the file view I saw earlier! 
-// Wait, I need to check if I missed imports in my previous REPLACE.
+import referralRoutes from './referralRoutes.js';
 
-// Let's restore the ORIGINAL working inputs but with Finance added.
-// The previous file had:
-// router.use('/masters', masterRoutes);
-// router.use('/items', itemRoutes);
-// router.use('/transactions', ... transactionRoutes);
-// router.use('/laundry', laundryRoutes);
-// ...
-
-// My previous replace messed up the names. I will revert to using the correct names available in the file.
 router.use('/masters', masterRoutes);
 router.use('/items', itemRoutes);
 router.use('/transactions', authenticateToken, transactionRoutes);
@@ -110,5 +90,7 @@ router.use('/backup', backupRoutes);
 router.use('/backup/assets', assetBackupRoutes);
 router.use('/settings', authenticateToken, settingsRoutes);
 router.use('/finance', authenticateToken, financeRouter);
+router.use('/referrals', authenticateToken, referralRoutes);
+router.use('/shifts', authenticateToken, shiftRoutes);
 
 export default router;

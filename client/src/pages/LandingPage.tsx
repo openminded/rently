@@ -206,6 +206,13 @@ export default function LandingPage() {
     const [bookingStatus, setBookingStatus] = useState<'IDLE' | 'PENDING' | 'CONFIRMED' | 'FAILED'>('IDLE');
     const [modalStep, setModalStep] = useState<'DETAIL' | 'BOOKING'>('DETAIL');
     const [selectedVariant, setSelectedVariant] = useState<any>(null);
+
+    // Referral States
+    const [referralCode, setReferralCode] = useState('');
+    const [validatingReferral, setValidatingReferral] = useState(false);
+    const [referralValid, setReferralValid] = useState<boolean | null>(null);
+    const [referralMsg, setReferralMsg] = useState('');
+
     const navigate = useNavigate();
     const brand = useBrand();
 
@@ -254,7 +261,8 @@ export default function LandingPage() {
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     ...bookingForm,
-                    items: [{ variantId: selectedVariant.id, quantity: 1 }]
+                    items: [{ variantId: selectedVariant.id, quantity: 1 }],
+                    referralCode: referralValid ? referralCode : undefined
                 })
             });
             const data = await res.json();
@@ -851,6 +859,56 @@ export default function LandingPage() {
                                                 placeholder="budi@example.com"
                                             />
                                         </div>
+
+                                        {/* Referral Code */}
+                                        <div className="space-y-1.5">
+                                            <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-1">Kode Referral (Opsional)</label>
+                                            <div className="flex gap-2">
+                                                <input
+                                                    type="text"
+                                                    value={referralCode}
+                                                    onChange={e => {
+                                                        setReferralCode(e.target.value.toUpperCase());
+                                                        setReferralValid(null);
+                                                        setReferralMsg('');
+                                                    }}
+                                                    className={`flex-1 px-5 py-3 rounded-2xl bg-slate-50 border-2 transition-all font-mono font-bold text-sm uppercase ${referralValid === true ? 'border-green-500' :
+                                                            referralValid === false ? 'border-red-500' : 'border-transparent'
+                                                        }`}
+                                                    placeholder="CONTOH10"
+                                                />
+                                                <button
+                                                    type="button"
+                                                    disabled={validatingReferral || !referralCode}
+                                                    onClick={async () => {
+                                                        setValidatingReferral(true);
+                                                        try {
+                                                            const res = await fetch(`${API_BASE}/referrals/validate`, {
+                                                                method: 'POST',
+                                                                headers: { 'Content-Type': 'application/json' },
+                                                                body: JSON.stringify({ code: referralCode })
+                                                            });
+                                                            const data = await res.json();
+                                                            setReferralValid(data.valid);
+                                                            setReferralMsg(data.message || (data.valid ? 'Kode berhasil digunakan!' : 'Kode tidak valid'));
+                                                        } catch (err) {
+                                                            setReferralMsg('Gagal memvalidasi kode');
+                                                        } finally {
+                                                            setValidatingReferral(false);
+                                                        }
+                                                    }}
+                                                    className="px-6 py-3 bg-[#A67C52] text-white rounded-2xl font-bold text-xs uppercase"
+                                                >
+                                                    {validatingReferral ? '...' : 'Cek'}
+                                                </button>
+                                            </div>
+                                            {referralMsg && (
+                                                <p className={`text-[10px] font-bold ml-1 ${referralValid ? 'text-green-600' : 'text-red-500'}`}>
+                                                    {referralMsg}
+                                                </p>
+                                            )}
+                                        </div>
+
                                         <div className="space-y-3">
                                             <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-1 block">Pilih Jadwal Sewa (Ambil & Kembali)</label>
                                             <CalendarPicker

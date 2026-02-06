@@ -281,6 +281,7 @@ export default function Laundry() {
                             data={waitingItems}
                             columns={waitingColumns}
                             searchKeys={['itemInstance.sku', 'itemInstance.itemVariant.item.name']}
+                            noCard={true}
                         />
                     </div>
 
@@ -293,6 +294,7 @@ export default function Laundry() {
                             data={batches}
                             columns={batchColumns}
                             searchKeys={['partner.name', 'note']}
+                            noCard={true}
                             actions={(batch: any) => (
                                 <button
                                     onClick={() => handleOpenCompleteModal(batch)}
@@ -316,6 +318,7 @@ export default function Laundry() {
                         data={batches}
                         columns={batchColumns}
                         searchKeys={['partner.name', 'note']}
+                        noCard={true}
                     />
                 </div>
             )}
