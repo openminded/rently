@@ -325,8 +325,8 @@ export const transactionController = {
                 const newTransaction = await tx.transaction.create({
                     data: {
                         type,
-                        customer: { connect: { id: customerId } },
-                        ...(req.user?.id ? { user: { connect: { id: req.user.id } } } : {}),
+                        customerId,
+                        userId: req.user?.id ?? null,
                         pickupDate: new Date(pickupDate),
                         returnPlanDate: new Date(returnPlanDate),
                         status: type === 'IMMEDIATE' ? 'RENTED' : 'BOOKED',
