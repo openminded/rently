@@ -75,7 +75,7 @@ export const shiftController = {
             const { actualCash, notes } = req.body;
 
             const shift = await prisma.shift.findUnique({
-                where: { id: parseInt(id) }
+                where: { id: parseInt(id as string) }
             });
 
             if (!shift || shift.status === 'CLOSED') {

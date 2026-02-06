@@ -130,7 +130,7 @@ export const transactionController = {
                         paymentStatus: 'UNPAID',
                         source: 'ONLINE',
                         items: { create: txItems },
-                        referralCode: referralId ? { connect: { id: referralId } } : undefined
+                        ...(referralId ? { referralCode: { connect: { id: referralId } } } : {})
                     }
                 });
 
@@ -337,7 +337,7 @@ export const transactionController = {
                         items: {
                             create: transactionItemsData
                         },
-                        referralCode: referralId ? { connect: { id: referralId } } : undefined
+                        ...(referralId ? { referralCode: { connect: { id: referralId } } } : {})
                     }
                 });
 
