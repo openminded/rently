@@ -409,7 +409,7 @@ export const transactionController = {
                                 amount: payment.amount,
                                 paymentMethodId: payment.methodId,
                                 createdById: req.user?.id ?? null,
-                                shiftId: activeShift?.id
+                                shiftId: activeShift?.id ?? null
                             }
                         });
 
@@ -507,7 +507,7 @@ export const transactionController = {
                         paymentMethodId: payment.methodId,
                         note: payment.note || 'Manual Payment',
                         createdById: req.user?.id ?? null,
-                        shiftId: activeShift?.id
+                        shiftId: activeShift?.id ?? null
                     }
                 });
 
@@ -612,7 +612,7 @@ export const transactionController = {
                             paymentMethodId: payment.methodId,
                             note: payment.note || 'Pickup Payment',
                             createdById: req.user?.id ?? null,
-                            shiftId: activeShift?.id
+                            shiftId: activeShift?.id ?? null
                         }
                     });
                 }
@@ -755,7 +755,7 @@ export const transactionController = {
                             paymentMethodId: payment.methodId,
                             note: payment.note || 'Fine Payment',
                             createdById: req.user?.id ?? null,
-                            shiftId: activeShift?.id
+                            shiftId: activeShift?.id ?? null
                         }
                     });
                     addedPayment = parseFloat(payment.amount);
