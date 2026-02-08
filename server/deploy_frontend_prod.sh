@@ -14,7 +14,7 @@ echo "VITE_API_URL=https://werently.com/api" > .env
 
 # 3. Install Dependencies
 echo "📦 Installing Frontend Dependencies..."
-npm install
+npm install --legacy-peer-deps
 
 # 4. Build Project
 echo "🔨 Building Frontend..."
