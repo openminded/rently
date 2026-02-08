@@ -16,7 +16,14 @@ echo "VITE_API_URL=https://werently.com/api" > .env
 echo "📦 Installing Frontend Dependencies..."
 npm install --legacy-peer-deps
 
-# 4. Build Project
+# 4. Handle AA Panel specific issue (.user.ini permission)
+if [ -f "dist/.user.ini" ]; then
+    echo "🔓 Unlocking dist/.user.ini..."
+    chattr -i dist/.user.ini
+    rm dist/.user.ini
+fi
+
+# 5. Build Project
 echo "🔨 Building Frontend..."
 npm run build
 
