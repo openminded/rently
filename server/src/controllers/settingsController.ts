@@ -6,7 +6,11 @@ const prisma = new PrismaClient();
 
 export const getAllSettings = async (req: Request, res: Response) => {
     try {
-        const settings = await prisma.appSetting.findMany();
+        // @ts-ignore
+        const businessId = req.user?.businessId;
+        const settings = await prisma.appSetting.findMany({
+            where: { businessId }
+        });
         // Convert to object for easier consumption { KEY: VALUE }
         const settingsMap: { [key: string]: string } = {};
         settings.forEach(s => {
@@ -21,8 +25,11 @@ export const getAllSettings = async (req: Request, res: Response) => {
 // Public settings fetcher (subset of settings)
 export const getPublicSettings = async (req: Request, res: Response) => {
     try {
+        const businessId = parseInt(req.query.businessId as string) || 1;
+
         const settings = await prisma.appSetting.findMany({
             where: {
+                businessId, // Filter by Business
                 OR: [
                     { key: { in: ['BRAND_NAME', 'BRAND_LOGO', 'BRAND_TAGLINE'] } },
                     { key: { startsWith: 'LANDING_' } }
@@ -43,12 +50,24 @@ export const updateSettings = async (req: Request, res: Response) => {
     try {
         const updates = req.body; // Expecting { KEY: VALUE, KEY2: VALUE2 }
 
-        const promises = Object.keys(updates).map(key => {
-            return prisma.appSetting.upsert({
-                where: { key },
-                update: { value: updates[key] },
-                create: { key, value: updates[key] }
+        // @ts-ignore
+        const businessId = req.user?.businessId;
+
+        const promises = Object.keys(updates).map(async (key) => {
+            const existing = await prisma.appSetting.findFirst({
+                where: { key, businessId }
             });
+
+            if (existing) {
+                return prisma.appSetting.update({
+                    where: { id: existing.id },
+                    data: { value: updates[key] }
+                });
+            } else {
+                return prisma.appSetting.create({
+                    data: { key, value: updates[key], businessId }
+                });
+            }
         });
 
         await Promise.all(promises);

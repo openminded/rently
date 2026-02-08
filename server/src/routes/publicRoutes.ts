@@ -14,4 +14,7 @@ router.get('/variants/:variantId/availability', inventoryController.getVariantAv
 router.post('/book', transactionController.publicBook);
 router.get('/transactions/:id/status', transactionController.getTransactionStatus);
 
+// Public Business Info
+router.get('/business/:slug', masterController.getBusinessBySlug);
+
 export default router;

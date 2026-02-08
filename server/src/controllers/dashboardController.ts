@@ -6,6 +6,9 @@ export const dashboardController = {
         try {
             const { startDate, endDate } = req.query;
 
+            // @ts-ignore
+            const businessId = req.user?.businessId;
+
             // Build Date Filter
             const dateFilter: any = {};
             if (startDate && endDate) {
@@ -27,6 +30,7 @@ export const dashboardController = {
             const payments = await prisma.payment.aggregate({
                 _sum: { amount: true },
                 where: {
+                    businessId,
                     date: dateFilter.createdAt // Payment date matches filter
                 }
             });
@@ -37,18 +41,20 @@ export const dashboardController = {
             // Or "Rentals created in range". Let's do Current Active for the card.
             const activeRentals = await prisma.transaction.count({
                 where: {
+                    businessId,
                     status: { in: ['RENTED', 'WAITING_PICKUP'] }
                 }
             });
 
             // 3. New Customers (in range)
             const newCustomers = await prisma.customer.count({
-                where: dateFilter
+                where: { ...dateFilter, businessId }
             });
 
             // 4. Returns Overdue (Current Snapshot)
             const lateReturns = await prisma.transaction.count({
                 where: {
+                    businessId,
                     status: 'RENTED',
                     returnPlanDate: { lt: new Date() }
                 }
@@ -59,20 +65,22 @@ export const dashboardController = {
                 take: 5,
                 orderBy: { createdAt: 'desc' },
                 include: { customer: true },
-                where: dateFilter
+                where: { ...dateFilter, businessId }
             });
 
             // 6. Inventory Monitoring Stats
+            const itemFilter = { itemVariant: { item: { businessId } } };
             const [totalUnits, availableUnits, maintenanceUnits, rentedUnits] = await Promise.all([
-                prisma.itemInstance.count(),
-                prisma.itemInstance.count({ where: { status: 'AVAILABLE' } }),
-                prisma.itemInstance.count({ where: { status: { in: ['IN_LAUNDRY', 'NOT_READY'] } } }),
-                prisma.itemInstance.count({ where: { status: 'RENTED' } })
+                prisma.itemInstance.count({ where: itemFilter }),
+                prisma.itemInstance.count({ where: { status: 'AVAILABLE', ...itemFilter } }),
+                prisma.itemInstance.count({ where: { status: { in: ['IN_LAUNDRY', 'NOT_READY'] }, ...itemFilter } }),
+                prisma.itemInstance.count({ where: { status: 'RENTED', ...itemFilter } })
             ]);
 
             // Out of stock items (Items where no variant has any AVAILABLE instance)
             // Simplified: Items where ALL instances are NOT AVAILABLE
             const allItems = await prisma.item.findMany({
+                where: { businessId },
                 include: {
                     variants: {
                         include: {
@@ -93,14 +101,18 @@ export const dashboardController = {
             // 7. Referral Commission Stats
             const commissions = await prisma.commissionLog.aggregate({
                 _sum: { amount: true },
-                where: dateFilter
+                where: {
+                    ...dateFilter,
+                    referralCode: { businessId }
+                }
             });
 
             const pendingCommissions = await prisma.commissionLog.aggregate({
                 _sum: { amount: true },
                 where: {
                     ...dateFilter,
-                    status: 'PENDING'
+                    status: 'PENDING',
+                    referralCode: { businessId }
                 }
             });
 
@@ -146,10 +158,12 @@ export const dashboardController = {
 
             const isKasir = user?.role === 'KASIR';
             const userFilter = isKasir ? { userId: user.id } : {};
+            const businessId = user?.businessId;
 
             // Revenue Trend (Group by Date)
             const payments = await prisma.payment.findMany({
                 where: {
+                    businessId,
                     date: { gte: start, lte: end },
                     transaction: userFilter
                 },
@@ -176,6 +190,7 @@ export const dashboardController = {
             const txItems = await prisma.transactionItem.findMany({
                 where: {
                     transaction: {
+                        businessId,
                         createdAt: { gte: start, lte: end },
                         ...userFilter
                     }
@@ -207,6 +222,7 @@ export const dashboardController = {
             if (!isKasir) {
                 const allPayments = await prisma.payment.findMany({
                     where: {
+                        businessId,
                         date: { gte: start, lte: end }
                     },
                     include: {
@@ -230,7 +246,8 @@ export const dashboardController = {
             // Commission Trend
             const commissionLogs = await prisma.commissionLog.findMany({
                 where: {
-                    createdAt: { gte: start, lte: end }
+                    createdAt: { gte: start, lte: end },
+                    referralCode: { businessId }
                 },
                 select: { createdAt: true, amount: true }
             });

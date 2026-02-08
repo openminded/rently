@@ -7,7 +7,18 @@ export const laundryController = {
     getAll: async (req: Request, res: Response) => {
         try {
             const { status } = req.query;
-            const where = status ? { status: status as string } : {};
+            // @ts-ignore
+            const businessId = req.user?.businessId;
+            const where: any = status ? { status: status as string } : {};
+
+            // Scope by Item ownership
+            where.itemInstance = {
+                itemVariant: {
+                    item: {
+                        businessId
+                    }
+                }
+            };
 
             const items = await prisma.laundryLog.findMany({
                 where,
@@ -38,7 +49,10 @@ export const laundryController = {
     getBatches: async (req: Request, res: Response) => {
         try {
             const { status } = req.query;
-            const where = status ? { status: status as string } : {};
+            // @ts-ignore
+            const businessId = req.user?.businessId;
+            const where: any = status ? { status: status as string } : {};
+            where.businessId = businessId;
 
             const batches = await prisma.laundryBatch.findMany({
                 where,
@@ -75,11 +89,33 @@ export const laundryController = {
                 return res.status(400).json({ error: 'Partner and items are required' });
             }
 
+            // @ts-ignore
+            const businessId = req.user?.businessId;
+
+            // Verify Partner Ownership
+            const partner = await prisma.laundryPartner.findFirst({
+                where: { id: parseInt(partnerId), businessId }
+            });
+            if (!partner) return res.status(404).json({ error: 'Laundry Partner not found' });
+
+            // Verify Logs Ownership
+            const validLogs = await prisma.laundryLog.count({
+                where: {
+                    id: { in: logIds },
+                    itemInstance: { itemVariant: { item: { businessId } } }
+                }
+            });
+
+            if (validLogs !== logIds.length) {
+                return res.status(400).json({ error: 'One or more laundry items do not belong to your business' });
+            }
+
             const result = await prisma.$transaction(async (tx) => {
                 // Create batch
                 const batch = await tx.laundryBatch.create({
                     data: {
                         partnerId,
+                        businessId,
                         expense: expense || 0,
                         note,
                         status: 'IN_PROGRESS'
@@ -98,11 +134,15 @@ export const laundryController = {
                 // Create expense record
                 if (expense && expense > 0) {
                     // Find 'Laundry' category
-                    let laundryCategory = await tx.expenseCategory.findUnique({ where: { name: 'Laundry' } });
+                    let laundryCategory = await tx.expenseCategory.findFirst({
+                        where: { name: 'Laundry', businessId: businessId }
+                    });
 
                     // Fallback if not seeded
                     if (!laundryCategory) {
-                        laundryCategory = await tx.expenseCategory.create({ data: { name: 'Laundry' } });
+                        laundryCategory = await tx.expenseCategory.create({
+                            data: { name: 'Laundry', businessId: businessId }
+                        });
                     }
 
                     await tx.expense.create({
@@ -112,7 +152,8 @@ export const laundryController = {
                             description: `Laundry batch #${batch.id} - ${note || 'Sent to partner'}`,
                             categoryId: laundryCategory.id,
                             referenceId: batch.id,
-                            createdById: userId
+                            createdById: userId,
+                            businessId: businessId
                         }
                     });
                 }
@@ -135,6 +176,14 @@ export const laundryController = {
 
             await prisma.$transaction(async (tx) => {
                 const batchId = parseInt((id as string) || '0');
+                // @ts-ignore
+                const businessId = req.user?.businessId;
+
+                // Verify Batch Ownership
+                const batch = await tx.laundryBatch.findFirst({
+                    where: { id: batchId, businessId }
+                });
+                if (!batch) throw new Error('Laundry Batch not found');
 
                 // If items provided, update specific logs
                 if (items && Array.isArray(items) && items.length > 0) {

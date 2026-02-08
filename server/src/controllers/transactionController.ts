@@ -14,10 +14,16 @@ export const transactionController = {
             }
 
             // 2. Customer Handling (Find or Create)
-            let customer = await prisma.customer.findUnique({ where: { phone } });
+            // 2. Customer Handling (Find or Create)
+            // Public booking defaults to Business ID 1 if not specified (Migration fallback)
+            const targetBusinessId = req.body.businessId ? Number(req.body.businessId) : 1;
+
+            let customer = await prisma.customer.findFirst({
+                where: { phone, businessId: targetBusinessId }
+            });
             if (!customer) {
                 customer = await prisma.customer.create({
-                    data: { name, phone, email }
+                    data: { name, phone, email, businessId: targetBusinessId }
                 });
             } else if (!customer.email) {
                 // Update email if previously empty
@@ -33,7 +39,10 @@ export const transactionController = {
 
             // Fetch Settings
             const setRes = await prisma.appSetting.findMany({
-                where: { key: { in: ['ENABLE_MAX_LAUNDRY_DAY', 'MAX_LAUNDRY_DAYS'] } }
+                where: {
+                    key: { in: ['ENABLE_MAX_LAUNDRY_DAY', 'MAX_LAUNDRY_DAYS'] },
+                    businessId: targetBusinessId
+                }
             });
             const enableLaundryRule = setRes.find(s => s.key === 'ENABLE_MAX_LAUNDRY_DAY')?.value === 'true';
             const laundryDays = parseInt(setRes.find(s => s.key === 'MAX_LAUNDRY_DAYS')?.value || '0');
@@ -87,8 +96,14 @@ export const transactionController = {
                 let commissionRate = 0;
 
                 if (referralCode && typeof referralCode === 'string') {
-                    const ref = await tx.referralCode.findUnique({
-                        where: { code: referralCode.toUpperCase(), isActive: true }
+                    // Use findFirst because code might not be unique globally (though businessId should scope it)
+                    // publicBook defaults to businessId 1
+                    const ref = await tx.referralCode.findFirst({
+                        where: {
+                            code: referralCode.toUpperCase(),
+                            isActive: true,
+                            businessId: targetBusinessId
+                        }
                     });
                     if (ref) {
                         referralId = ref.id;
@@ -130,7 +145,8 @@ export const transactionController = {
                         paymentStatus: 'UNPAID',
                         source: 'ONLINE',
                         items: { create: txItems },
-                        referralCodeId: referralId ?? null
+                        referralCodeId: referralId ?? null,
+                        businessId: targetBusinessId
                     }
                 });
 
@@ -191,8 +207,15 @@ export const transactionController = {
             const quantityRequests = items.filter((i: any) => i.variantId && i.quantity > 0);
 
             // Fetch Settings (Laundry & SaaS)
+            // @ts-ignore
+            const businessId = req.user?.businessId;
+            if (!businessId) throw new Error("User has no business assigned");
+
             const settings = await prisma.appSetting.findMany({
-                where: { key: { in: ['ENABLE_MAX_LAUNDRY_DAY', 'MAX_LAUNDRY_DAYS', 'SAAS_FEE_TYPE', 'SAAS_FEE_AMOUNT', 'SAAS_FEE_CHARGED_TO'] } }
+                where: {
+                    key: { in: ['ENABLE_MAX_LAUNDRY_DAY', 'MAX_LAUNDRY_DAYS', 'SAAS_FEE_TYPE', 'SAAS_FEE_AMOUNT', 'SAAS_FEE_CHARGED_TO'] },
+                    businessId: businessId
+                }
             });
             const enableLaundryRule = settings.find(s => s.key === 'ENABLE_MAX_LAUNDRY_DAY')?.value === 'true';
             const laundryDays = parseInt(settings.find(s => s.key === 'MAX_LAUNDRY_DAYS')?.value || '0');
@@ -289,8 +312,12 @@ export const transactionController = {
                 let referralId: number | undefined;
                 let commissionRate = 0;
                 if (referralCode && typeof referralCode === 'string') {
-                    const ref = await tx.referralCode.findUnique({
-                        where: { code: referralCode.toUpperCase(), isActive: true }
+                    const ref = await tx.referralCode.findFirst({
+                        where: {
+                            code: referralCode.toUpperCase(),
+                            isActive: true,
+                            businessId: businessId
+                        }
                     });
                     if (ref) {
                         referralId = ref.id;
@@ -337,9 +364,11 @@ export const transactionController = {
                         items: {
                             create: transactionItemsData
                         },
-                        referralCodeId: referralId ?? null
+                        referralCodeId: referralId ?? null,
+                        businessId: businessId
                     }
                 });
+
 
                 // --- Log SaaS Fee ---
                 if (saasChargedTo !== 'NONE' && calculatedSaasFee > 0) {
@@ -368,13 +397,13 @@ export const transactionController = {
 
                 // Payment Handling
                 if (payment) {
-                    const paymentMethod = await tx.paymentMethod.findUnique({
-                        where: { id: payment.methodId }
+                    const paymentMethod = await tx.paymentMethod.findFirst({
+                        where: { id: payment.methodId, businessId: businessId }
                     });
 
                     // If it is GATEWAY (Duitku), we generate Duitku Invoice but do NOT mark as paid yet.
                     if (paymentMethod?.type === 'GATEWAY') {
-                        const customer = await tx.customer.findUnique({ where: { id: customerId } });
+                        const customer = await tx.customer.findFirst({ where: { id: customerId, businessId: businessId } });
                         const productDetails = `Rental Transaction #${newTransaction.id}`;
 
                         try {
@@ -440,7 +469,11 @@ export const transactionController = {
 
     getAll: async (req: Request, res: Response) => {
         try {
+            // @ts-ignore
+            const businessId = req.user?.businessId;
+
             const txs = await prisma.transaction.findMany({
+                where: { businessId }, // Filter by Business
                 include: { customer: true, items: { include: { itemInstance: { include: { itemVariant: { include: { item: true, color: true, size: true } } } } } }, payments: { include: { paymentMethod: true } } },
                 orderBy: { createdAt: 'desc' }
             });
@@ -455,17 +488,19 @@ export const transactionController = {
         try {
             const { id } = req.params;
             const { payment } = req.body;
+            // @ts-ignore
+            const businessId = req.user?.businessId;
 
-            const transaction = await prisma.transaction.findUnique({
-                where: { id: parseInt((id as string) || '0') }
+            const transaction = await prisma.transaction.findFirst({
+                where: { id: parseInt((id as string) || '0'), businessId } // Verified Check
             });
 
             if (!transaction) return res.status(404).json({ error: 'Transaction not found' });
             if (transaction.status !== 'BOOKED') return res.status(400).json({ error: 'Transaction Status must be BOOKED to add payment here.' });
 
             const result = await prisma.$transaction(async (tx) => {
-                const paymentMethod = await tx.paymentMethod.findUnique({
-                    where: { id: payment.methodId }
+                const paymentMethod = await tx.paymentMethod.findFirst({
+                    where: { id: payment.methodId, businessId: businessId }
                 });
 
                 // If GATEWAY (Duitku)
@@ -546,9 +581,11 @@ export const transactionController = {
         try {
             const { id } = req.params;
             const { payment } = req.body; // Optional additional payment
+            // @ts-ignore
+            const businessId = req.user?.businessId;
 
-            const transaction = await prisma.transaction.findUnique({
-                where: { id: parseInt((id as string) || '0') },
+            const transaction = await prisma.transaction.findFirst({
+                where: { id: parseInt((id as string) || '0'), businessId },
                 include: { payments: true, items: { include: { itemInstance: true } } }
             });
 
@@ -573,8 +610,8 @@ export const transactionController = {
             const result = await prisma.$transaction(async (tx) => {
                 // 1. Record Payment if any
                 if (payment) {
-                    const paymentMethod = await tx.paymentMethod.findUnique({
-                        where: { id: payment.methodId }
+                    const paymentMethod = await tx.paymentMethod.findFirst({
+                        where: { id: payment.methodId, businessId: businessId }
                     });
 
                     // If it is GATEWAY (Duitku), we generate QRIS but don't finalize transaction yet
@@ -671,8 +708,11 @@ export const transactionController = {
             console.log('Processing return for transaction:', id);
             console.log('Request body:', { returnDate, fines, itemsStatus });
 
-            const transaction = await prisma.transaction.findUnique({
-                where: { id: parseInt((id as string) ?? '0') },
+            // @ts-ignore
+            const businessId = req.user?.businessId;
+
+            const transaction = await prisma.transaction.findFirst({
+                where: { id: parseInt((id as string) ?? '0'), businessId },
                 include: { items: true }
             });
 
@@ -685,8 +725,8 @@ export const transactionController = {
             // 1. Check for Payment Method early if it is GATEWAY
             const { payment } = req.body;
             if (payment && payment.amount > 0) {
-                const paymentMethod = await prisma.paymentMethod.findUnique({
-                    where: { id: payment.methodId }
+                const paymentMethod = await prisma.paymentMethod.findFirst({
+                    where: { id: payment.methodId, businessId: businessId }
                 });
 
                 if (paymentMethod?.type === 'GATEWAY') {

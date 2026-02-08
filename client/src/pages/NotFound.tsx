@@ -1,10 +1,12 @@
 import { useNavigate } from 'react-router-dom';
 import { Home, ArrowLeft, AlertCircle } from 'lucide-react';
 import { useLanguage } from '../context/LanguageContext';
+import { useAuth } from '../context/AuthContext';
 
 export default function NotFound() {
     const navigate = useNavigate();
     const { t } = useLanguage();
+    const { business } = useAuth();
 
     return (
         <div className="min-h-screen bg-gray-50 flex flex-col items-center justify-center p-4">
@@ -30,7 +32,7 @@ export default function NotFound() {
                     </button>
 
                     <button
-                        onClick={() => navigate('/app')}
+                        onClick={() => navigate(business ? `/${business.slug}/app` : '/app')}
                         className="w-full flex items-center justify-center gap-2 px-6 py-3 bg-gray-900 text-white font-medium rounded-xl hover:bg-gray-800 transition-colors shadow-lg shadow-gray-900/10"
                     >
                         <Home size={18} />

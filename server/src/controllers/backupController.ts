@@ -7,11 +7,13 @@ import path from 'path';
 // For Restore/Deletion: Delete in reverse order of creation
 const models = [
     'Broadcast', // Depends on BroadcastTemplate
-    'Fine', 'Payment', 'TransactionItem', 'Transaction', // Transactions depends on Customer
+    'Fine', 'Payment', 'TransactionItem', 'CommissionLog', 'Transaction', // Transactions depends on Customer, CommissionLog depends on ReferralCode/Transaction
+    'Shift', // Shift
     'Expense', // Expense might link to User, LaundryBatch, or ExpenseCategory
     'LaundryLog', // LaundryLog depends on LaundryBatch (sometimes) and ItemInstance
     'LaundryBatch', // LaundryBatch depends on LaundryPartner
     'LaundryPartner',
+    'ReferralCode', 'ReferralPartner', // Referrals
     'ItemInstance', 'ItemVariant', 'ItemImage', 'Item', // Items
     'Customer', 'Category', 'Brand', 'Color', 'Size', 'PaymentMethod', 'ViolationType',
     'ExpenseCategory', 'DepositVariant', 'BroadcastTemplate', 'AppSetting', 'User'
@@ -21,10 +23,66 @@ const models = [
 const creationOrder = [
     'User', 'AppSetting', 'ViolationType', 'PaymentMethod', 'Size', 'Color', 'Brand', 'Category', 'Customer',
     'ExpenseCategory', 'DepositVariant', 'BroadcastTemplate',
+    'ReferralPartner', 'ReferralCode',
     'Item', 'ItemImage', 'ItemVariant', 'ItemInstance',
     'LaundryPartner', 'LaundryBatch', 'LaundryLog',
-    'Transaction', 'TransactionItem', 'Payment', 'Fine', 'Expense', 'Broadcast'
+    'Shift',
+    'Transaction', 'TransactionItem', 'Payment', 'Fine', 'Expense', 'Broadcast', 'CommissionLog'
 ];
+
+// Map model to businessId path (null if global or inferred, but most should be scoped)
+const modelBusinessScopes: { [key: string]: string } = {
+    'User': 'businessId',
+    'AppSetting': 'businessId',
+    'ViolationType': 'businessId',
+    'PaymentMethod': 'businessId',
+    'Size': 'businessId',
+    'Color': 'businessId',
+    'Brand': 'businessId',
+    'Category': 'businessId',
+    'Customer': 'businessId',
+    'ExpenseCategory': 'businessId',
+    'DepositVariant': 'businessId',
+    'BroadcastTemplate': 'businessId',
+    'ReferralPartner': 'businessId',
+    'ReferralCode': 'businessId',
+    'Item': 'businessId',
+    'ItemImage': 'item.businessId', // Nested
+    'ItemVariant': 'item.businessId', // Nested
+    'ItemInstance': 'itemVariant.item.businessId', // Nested
+    'LaundryPartner': 'businessId',
+    'LaundryBatch': 'businessId',
+    'LaundryLog': 'itemInstance.itemVariant.item.businessId', // Through Item
+    'Shift': 'businessId',
+    'Transaction': 'businessId',
+    'TransactionItem': 'transaction.businessId', // Nested
+    'Payment': 'businessId',
+    'Fine': 'transaction.businessId', // Nested
+    'Expense': 'businessId',
+    'Broadcast': 'businessId',
+    'CommissionLog': 'referralCode.businessId' // Nested
+};
+
+// Helper to construct where clause
+const getScope = (modelName: string, businessId: number) => {
+    const path = modelBusinessScopes[modelName];
+    if (!path) return {}; // Warning: Global access
+
+    // Convert dot notation to nested object
+    // e.g. 'item.businessId' -> { item: { businessId: 1 } }
+    const parts = path.split('.');
+    let query: any = { businessId };
+
+    // Construct from inside out? No, reduceRight?
+    // parts = ['item', 'businessId'] -> { item: { businessId } }
+    // Actually simplicity:
+    if (parts.length === 1) return { businessId };
+    if (parts.length === 2) return { [parts[0] as string]: { businessId } };
+    if (parts.length === 3) return { [parts[0] as string]: { [parts[1] as string]: { businessId } } };
+    if (parts.length === 4) return { [parts[0] as string]: { [parts[1] as string]: { [parts[2] as string]: { businessId } } } };
+
+    return {};
+};
 
 export const backupController = {
     // 1. BACKUP: Dump all data to JSON
@@ -34,11 +92,21 @@ export const backupController = {
 
             // Loop through all models and fetch data
             // We use creationOrder for backup content (logical grouping)
+            // @ts-ignore
+            const businessId = req.user?.businessId;
+
+            // Loop through all models and fetch data
+            // We use creationOrder for backup content (logical grouping)
             for (const modelName of creationOrder) {
                 // @ts-ignore
                 if (prisma[modelName.charAt(0).toLowerCase() + modelName.slice(1)]) {
+                    // Start Scoping
+                    const where = getScope(modelName, businessId);
+
                     // @ts-ignore
-                    backupData[modelName] = await prisma[modelName.charAt(0).toLowerCase() + modelName.slice(1)].findMany();
+                    backupData[modelName] = await prisma[modelName.charAt(0).toLowerCase() + modelName.slice(1)].findMany({
+                        where
+                    });
                 }
             }
 
@@ -65,12 +133,17 @@ export const backupController = {
 
             await prisma.$transaction(async (tx) => {
                 // 1. Delete all existing data (Respect Foreign Keys)
+                // 1. Delete all existing data (Respect Foreign Keys)
+                // @ts-ignore
+                const businessId = req.user?.businessId;
+
                 for (const modelName of models) {
                     const modelKey = modelName.charAt(0).toLowerCase() + modelName.slice(1);
                     // @ts-ignore
                     if (tx[modelKey]) {
+                        const where = getScope(modelName, businessId);
                         // @ts-ignore
-                        await tx[modelKey].deleteMany();
+                        await tx[modelKey].deleteMany({ where });
                     }
                 }
 
@@ -126,12 +199,17 @@ export const backupController = {
 
             await prisma.$transaction(async (tx) => {
                 // Delete only operational data (Respects Foreign Keys)
+                // @ts-ignore
+                const businessId = req.user?.businessId;
+
+                // Delete only operational data (Respects Foreign Keys)
                 for (const modelName of operationalModels) {
                     const modelKey = modelName.charAt(0).toLowerCase() + modelName.slice(1);
                     // @ts-ignore
                     if (tx[modelKey]) {
+                        const where = getScope(modelName, businessId);
                         // @ts-ignore
-                        await tx[modelKey].deleteMany();
+                        await tx[modelKey].deleteMany({ where });
                     }
                 }
             });

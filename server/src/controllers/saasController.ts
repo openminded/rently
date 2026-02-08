@@ -18,6 +18,12 @@ export const saasController = {
                 };
             }
 
+            // @ts-ignore
+            const businessId = req.user?.businessId;
+            if (businessId) {
+                where.transaction = { businessId };
+            }
+
             const logs = await prisma.saaSFeeLog.findMany({
                 where,
                 include: {

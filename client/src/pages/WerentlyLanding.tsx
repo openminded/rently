@@ -427,7 +427,7 @@ export default function WerentlyLanding() {
                             <Globe size={14} className="hidden sm:block" /> {lang}
                         </button>
 
-                        <button onClick={() => navigate('/login')} className="hidden sm:block bg-indigo-600 text-white px-5 lg:px-8 py-3 rounded-xl text-[11px] lg:text-xs font-black uppercase tracking-widest hover:bg-indigo-700 hover:shadow-2xl hover:-translate-y-0.5 transition-all shadow-indigo-200 shadow-xl">
+                        <button onClick={() => navigate('/register')} className="hidden sm:block bg-indigo-600 text-white px-5 lg:px-8 py-3 rounded-xl text-[11px] lg:text-xs font-black uppercase tracking-widest hover:bg-indigo-700 hover:shadow-2xl hover:-translate-y-0.5 transition-all shadow-indigo-200 shadow-xl">
                             {t.nav.getStarted}
                         </button>
                     </div>
@@ -453,7 +453,7 @@ export default function WerentlyLanding() {
                             {t.hero.description}
                         </p>
                         <div className="flex flex-col sm:flex-row gap-4">
-                            <button onClick={() => navigate('/login')} className="px-8 py-4 bg-indigo-600 text-white rounded-full font-bold shadow-xl shadow-indigo-200 hover:shadow-2xl hover:-translate-y-1 transition-all flex items-center justify-center gap-2">
+                            <button onClick={() => navigate('/register')} className="px-8 py-4 bg-indigo-600 text-white rounded-full font-bold shadow-xl shadow-indigo-200 hover:shadow-2xl hover:-translate-y-1 transition-all flex items-center justify-center gap-2">
                                 {t.hero.ctaPrimary} <ArrowRight size={18} />
                             </button>
                             <button className="px-8 py-4 bg-white text-slate-700 border border-slate-200 rounded-full font-bold hover:bg-slate-50 transition-all flex items-center justify-center gap-2">

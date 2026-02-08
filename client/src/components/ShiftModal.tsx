@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useShift } from '../context/ShiftContext';
 import { useLanguage } from '../context/LanguageContext';
+import { useAuth } from '../context/AuthContext';
 import { X, AlertTriangle, Lock, Unlock } from 'lucide-react';
 import { clsx } from 'clsx';
 
@@ -17,6 +18,7 @@ export const OpenShiftModal: React.FC<OpenShiftModalProps> = ({ isOpen, onClose 
     const [notes, setNotes] = useState('');
     const [submitting, setSubmitting] = useState(false);
     const navigate = useNavigate();
+    const { business } = useAuth();
 
     if (!isOpen) return null;
 
@@ -86,7 +88,7 @@ export const OpenShiftModal: React.FC<OpenShiftModalProps> = ({ isOpen, onClose 
                         </button>
                         <button
                             type="button"
-                            onClick={() => navigate('/app')}
+                            onClick={() => navigate(business ? `/${business.slug}/app` : '/app')}
                             className="w-full bg-white hover:bg-gray-50 text-gray-700 font-bold py-3 rounded-xl transition-all border border-gray-200"
                         >
                             Kembali ke Dashboard

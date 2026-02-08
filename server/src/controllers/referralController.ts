@@ -6,8 +6,10 @@ export const referralController = {
     createPartner: async (req: Request, res: Response) => {
         try {
             const { name, phone, email, bankInfo } = req.body;
+            // @ts-ignore
+            const businessId = req.user?.businessId;
             const partner = await prisma.referralPartner.create({
-                data: { name, phone, email, bankInfo }
+                data: { name, phone, email, bankInfo, businessId }
             });
             res.status(201).json(partner);
         } catch (error: any) {
@@ -17,7 +19,10 @@ export const referralController = {
 
     getAllPartners: async (req: Request, res: Response) => {
         try {
+            // @ts-ignore
+            const businessId = req.user?.businessId;
             const partners = await prisma.referralPartner.findMany({
+                where: { businessId },
                 include: { codes: true }
             });
             res.json(partners);
@@ -31,8 +36,10 @@ export const referralController = {
             const { id } = req.params;
             if (!id) return res.status(400).json({ error: 'ID is required' });
 
-            const partner = await prisma.referralPartner.findUnique({
-                where: { id: parseInt(id as string) },
+            // @ts-ignore
+            const businessId = req.user?.businessId;
+            const partner = await prisma.referralPartner.findFirst({
+                where: { id: parseInt(id as string), businessId },
                 include: { codes: true }
             });
             if (!partner) return res.status(404).json({ error: 'Partner not found' });
@@ -46,9 +53,25 @@ export const referralController = {
     createCode: async (req: Request, res: Response) => {
         try {
             const { partnerId, code, discountType, discountValue, commissionRate } = req.body;
+            // @ts-ignore
+            const businessId = req.user?.businessId;
+
+            // Check duplicate code in business
+            const existing = await prisma.referralCode.findFirst({
+                where: { code: code.toUpperCase(), businessId }
+            });
+            if (existing) return res.status(400).json({ error: 'Code already exists in this business' });
+
+            // Verify partner belongs to business
+            const partner = await prisma.referralPartner.findFirst({
+                where: { id: parseInt(partnerId), businessId }
+            });
+            if (!partner) return res.status(404).json({ error: 'Partner not found' });
+
             const newCode = await prisma.referralCode.create({
                 data: {
                     partnerId: parseInt(partnerId),
+                    businessId,
                     code: code.toUpperCase(),
                     discountType,
                     discountValue,
@@ -63,13 +86,16 @@ export const referralController = {
 
     validateCode: async (req: Request, res: Response) => {
         try {
-            const { code } = req.body;
+            const { code, businessId } = req.body; // Frontend MUST send businessId
             if (!code || typeof code !== 'string') {
                 return res.status(400).json({ valid: false, message: 'Referral code is required' });
             }
 
-            const referral = await prisma.referralCode.findUnique({
-                where: { code: code.toUpperCase() },
+            const where: any = { code: code.toUpperCase() };
+            if (businessId) where.businessId = parseInt(businessId);
+
+            const referral = await prisma.referralCode.findFirst({
+                where,
                 include: { partner: { select: { name: true } } }
             });
 
@@ -93,7 +119,14 @@ export const referralController = {
         try {
             const { id } = req.params;
             if (!id) return res.status(400).json({ error: 'ID is required' });
+            // @ts-ignore
             const { name, phone, email, bankInfo } = req.body;
+            const businessId = req.user?.businessId;
+            const existing = await prisma.referralPartner.findFirst({
+                where: { id: parseInt(id as string), businessId }
+            });
+            if (!existing) return res.status(404).json({ error: 'Partner not found' });
+
             const partner = await prisma.referralPartner.update({
                 where: { id: parseInt(id as string) },
                 data: { name, phone, email, bankInfo }
@@ -108,6 +141,13 @@ export const referralController = {
         try {
             const { id } = req.params;
             if (!id) return res.status(400).json({ error: 'ID is required' });
+            // @ts-ignore
+            const businessId = req.user?.businessId;
+            const existing = await prisma.referralPartner.findFirst({
+                where: { id: parseInt(id as string), businessId }
+            });
+            if (!existing) return res.status(404).json({ error: 'Partner not found' });
+
             await prisma.referralPartner.delete({
                 where: { id: parseInt(id as string) }
             });
@@ -121,10 +161,20 @@ export const referralController = {
     getCommissionLogs: async (req: Request, res: Response) => {
         try {
             const { partnerId, ids } = req.query;
+            // @ts-ignore
+            const businessId = req.user?.businessId;
+
             const pidString = typeof partnerId === 'string' ? partnerId : undefined;
             const pid = pidString ? parseInt(pidString) : undefined;
 
-            let whereClause: any = pid ? { referralCode: { partnerId: pid } } : {};
+            // Base filter: ReferralCode must belong to business
+            let whereClause: any = {
+                referralCode: {
+                    businessId
+                }
+            };
+
+            if (pid) whereClause.referralCode.partnerId = pid;
 
             if (ids && typeof ids === 'string') {
                 const idList = ids.split(',').map(id => parseInt(id));
@@ -188,7 +238,13 @@ export const referralController = {
         try {
             const { startDate, endDate, partnerId } = req.query;
 
-            const where: any = { status: 'PAID' };
+            // @ts-ignore
+            const businessId = req.user?.businessId;
+
+            const where: any = {
+                status: 'PAID',
+                referralCode: { businessId }
+            };
 
             if (startDate && endDate) {
                 where.paidAt = {
@@ -198,9 +254,7 @@ export const referralController = {
             }
 
             if (partnerId) {
-                where.referralCode = {
-                    partnerId: parseInt(partnerId as string)
-                };
+                where.referralCode.partnerId = parseInt(partnerId as string);
             }
 
             const logs = await prisma.commissionLog.findMany({

@@ -4,7 +4,10 @@ import { whatsappService } from '../services/whatsappService.js';
 
 export const getTemplates = async (req: Request, res: Response) => {
     try {
+        // @ts-ignore
+        const businessId = req.user?.businessId;
         const templates = await prisma.broadcastTemplate.findMany({
+            where: { businessId },
             orderBy: { updatedAt: 'desc' }
         });
         res.json(templates);
@@ -16,8 +19,10 @@ export const getTemplates = async (req: Request, res: Response) => {
 export const createTemplate = async (req: Request, res: Response) => {
     try {
         const { name, content } = req.body;
+        // @ts-ignore
+        const businessId = req.user?.businessId;
         const template = await prisma.broadcastTemplate.create({
-            data: { name, content }
+            data: { name, content, businessId }
         });
         res.json(template);
     } catch (error: any) {
@@ -29,6 +34,14 @@ export const updateTemplate = async (req: Request, res: Response) => {
     try {
         const { id } = req.params;
         const { name, content } = req.body;
+        // @ts-ignore
+        const businessId = req.user?.businessId;
+
+        const existing = await prisma.broadcastTemplate.findFirst({
+            where: { id: Number(id), businessId }
+        });
+        if (!existing) return res.status(404).json({ error: 'Template not found' });
+
         const template = await prisma.broadcastTemplate.update({
             where: { id: Number(id) },
             data: { name, content }
@@ -42,6 +55,14 @@ export const updateTemplate = async (req: Request, res: Response) => {
 export const deleteTemplate = async (req: Request, res: Response) => {
     try {
         const { id } = req.params;
+        // @ts-ignore
+        const businessId = req.user?.businessId;
+
+        const existing = await prisma.broadcastTemplate.findFirst({
+            where: { id: Number(id), businessId }
+        });
+        if (!existing) return res.status(404).json({ error: 'Template not found' });
+
         await prisma.broadcastTemplate.delete({
             where: { id: Number(id) }
         });
@@ -54,9 +75,12 @@ export const deleteTemplate = async (req: Request, res: Response) => {
 export const createBroadcast = async (req: Request, res: Response) => {
     try {
         const { templateId, name, content, scheduledAt, targets } = req.body;
+        // @ts-ignore
+        const businessId = req.user?.businessId;
 
         const broadcast = await prisma.broadcast.create({
             data: {
+                businessId,
                 templateId: templateId ? Number(templateId) : null,
                 name,
                 content,
@@ -77,7 +101,10 @@ export const createBroadcast = async (req: Request, res: Response) => {
 
 export const getBroadcastHistory = async (req: Request, res: Response) => {
     try {
+        // @ts-ignore
+        const businessId = req.user?.businessId;
         const history = await prisma.broadcast.findMany({
+            where: { businessId },
             include: { template: true },
             orderBy: { createdAt: 'desc' }
         });
@@ -103,6 +130,8 @@ export const sendDirectMessage = async (req: Request, res: Response) => {
 export const getReminderTargets = async (req: Request, res: Response) => {
     try {
         const { type } = req.query; // 'PICKUP' | 'RETURN'
+        // @ts-ignore
+        const businessId = req.user?.businessId;
         const now = new Date();
         const startOfDay = new Date(now.setHours(0, 0, 0, 0));
         const endOfDay = new Date(now.setHours(23, 59, 59, 999));
@@ -114,6 +143,7 @@ export const getReminderTargets = async (req: Request, res: Response) => {
             templateName = 'Reminder Pickup';
             const txs = await prisma.transaction.findMany({
                 where: {
+                    businessId,
                     status: { in: ['BOOKED', 'WAITING_PICKUP'] },
                     pickupDate: { gte: startOfDay, lte: endOfDay }
                 },
@@ -147,6 +177,7 @@ export const getReminderTargets = async (req: Request, res: Response) => {
             templateName = 'Reminder Return';
             const txs = await prisma.transaction.findMany({
                 where: {
+                    businessId,
                     status: 'RENTED',
                     returnPlanDate: { gte: startOfDay, lte: endOfDay }
                 },
@@ -180,7 +211,9 @@ export const getReminderTargets = async (req: Request, res: Response) => {
             return res.status(400).json({ error: 'Invalid type. Use PICKUP or RETURN' });
         }
 
-        const template = await prisma.broadcastTemplate.findUnique({ where: { name: templateName } });
+        const template = await prisma.broadcastTemplate.findFirst({
+            where: { name: templateName, businessId }
+        });
 
         res.json({
             targets,

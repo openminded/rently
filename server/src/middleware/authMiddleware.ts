@@ -11,6 +11,13 @@ export const authenticateToken = (req: Request, res: Response, next: NextFunctio
 
     jwt.verify(token, JWT_SECRET, (err: any, user: any) => {
         if (err) return res.status(403).json({ error: 'Invalid token.' });
+
+        // Security Check: Token MUST contain businessId (even if null)
+        // This prevents old tokens from accessing data globally due to Prisma's behavior with undefined.
+        if (user.businessId === undefined) {
+            return res.status(403).json({ error: 'Session expired (missing business context). Please login again.' });
+        }
+
         // @ts-ignore
         req.user = user;
         next();

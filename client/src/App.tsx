@@ -3,8 +3,10 @@ import { AuthProvider, ProtectedRoute } from './context/AuthContext';
 import { ShiftProvider } from './context/ShiftContext';
 import { LanguageProvider } from './context/LanguageContext';
 import Login from './pages/Login';
+import Register from './pages/SaaS/Register';
 import LandingPage from './pages/LandingPage';
 import WerentlyLanding from './pages/WerentlyLanding';
+import TenantRedirect from './components/TenantRedirect';
 import Layout from './components/Layout';
 import Dashboard from './pages/Dashboard';
 import POS from './pages/POS';
@@ -46,60 +48,69 @@ function App() {
               {/* Invoice Route - Independent Layout for Printing */}
               <Route path="/invoice/:id" element={<Invoice />} />
 
-              {/* Public Routes */}
+              {/* SaaS Landing & Registration */}
               <Route path="/" element={<WerentlyLanding />} />
-              <Route path="/store" element={<LandingPage />} />
-              <Route path="/login" element={<Login />} />
+              <Route path="/register" element={<Register />} />
 
-              {/* Protected App Routes */}
-              <Route path="/app" element={
-                <ProtectedRoute>
-                  <Layout />
-                </ProtectedRoute>
-              }>
-                <Route index element={<Dashboard />} />
-                <Route path="pos" element={<POS />} />
-                <Route path="inventory/catalog" element={<Inventory />} />
-                <Route path="inventory/showcase" element={<Showcase />} />
-                <Route path="inventory/history" element={<InventoryHistory />} />
+              {/* Dynamic Storefront: /:slug/web */}
+              <Route path="/:slug/web" element={<LandingPage />} />
+              <Route path="/:slug" element={<TenantRedirect />} />
 
-                {/* Transaction Routes */}
-                <Route path="transactions" element={<Transactions type="booking" />} />
-                <Route path="transactions/:type" element={<Transactions type="booking" />} />
+              {/* Dynamic App Routes: /:slug/app */}
+              <Route path="/:slug/app">
+                <Route path="login" element={<Login />} />
 
-                {/* Laundry Routes */}
-                <Route path="laundry" element={<Laundry />} />
+                <Route element={
+                  <ProtectedRoute>
+                    <Layout />
+                  </ProtectedRoute>
+                }>
+                  <Route index element={<Dashboard />} />
+                  <Route path="dashboard" element={<Dashboard />} />
+                  <Route path="pos" element={<POS />} />
+                  <Route path="inventory/catalog" element={<Inventory />} />
+                  <Route path="inventory/showcase" element={<Showcase />} />
+                  <Route path="inventory/history" element={<InventoryHistory />} />
 
-                {/* Master Data Routes */}
-                <Route path="masters/categories" element={<Categories />} />
-                <Route path="masters/brands" element={<Brands />} />
-                <Route path="masters/colors" element={<Colors />} />
-                <Route path="masters/sizes" element={<Sizes />} />
-                <Route path="masters/payments" element={<PaymentMethods />} />
-                <Route path="masters/violations" element={<ViolationTypes />} />
-                <Route path="masters/customers" element={<Customers />} />
-                <Route path="masters/laundry-partners" element={<LaundryPartner />} />
-                <Route path="referral" element={<ReferralPartners />} />
-                <Route path="referral/history" element={<PayoutHistory />} />
-                <Route path="masters/deposit-variants" element={<DepositVariants />} />
+                  {/* Transaction Routes */}
+                  <Route path="transactions" element={<Transactions type="booking" />} />
+                  <Route path="transactions/:type" element={<Transactions type="booking" />} />
 
-                {/* User Management */}
-                <Route path="users" element={<UserManagement />} />
+                  {/* Laundry Routes */}
+                  <Route path="laundry" element={<Laundry />} />
 
-                {/* Settings Routes */}
-                <Route path="settings/backup-restore" element={<BackupRestore />} />
-                <Route path="settings/brand" element={<Settings />} />
-                <Route path="settings/app-config" element={<AppConfig />} />
-                <Route path="broadcast" element={<Broadcast />} />
-                <Route path="broadcast/:tab" element={<Broadcast />} />
+                  {/* Master Data Routes */}
+                  <Route path="masters/categories" element={<Categories />} />
+                  <Route path="masters/brands" element={<Brands />} />
+                  <Route path="masters/colors" element={<Colors />} />
+                  <Route path="masters/sizes" element={<Sizes />} />
+                  <Route path="masters/payments" element={<PaymentMethods />} />
+                  <Route path="masters/violations" element={<ViolationTypes />} />
+                  <Route path="masters/customers" element={<Customers />} />
+                  <Route path="masters/laundry-partners" element={<LaundryPartner />} />
+                  <Route path="referral" element={<ReferralPartners />} />
+                  <Route path="referral/history" element={<PayoutHistory />} />
+                  <Route path="masters/deposit-variants" element={<DepositVariants />} />
 
-                {/* Finance Route */}
-                <Route path="finance" element={<Finance />} />
-                <Route path="shifts" element={<ShiftHistory />} />
+                  {/* User Management */}
+                  <Route path="users" element={<UserManagement />} />
 
+                  {/* Settings Routes */}
+                  <Route path="settings/backup-restore" element={<BackupRestore />} />
+                  <Route path="settings/brand" element={<Settings />} />
+                  <Route path="settings/app-config" element={<AppConfig />} />
+                  <Route path="broadcast" element={<Broadcast />} />
+                  <Route path="broadcast/:tab" element={<Broadcast />} />
 
+                  {/* Finance Route */}
+                  <Route path="finance" element={<Finance />} />
+                  <Route path="shifts" element={<ShiftHistory />} />
+                </Route>
               </Route>
 
+              {/* Legacy/Direct Routes (Redirect or Keep for Backward Compat if needed) */}
+              <Route path="/login" element={<Login />} />
+              {/* Note: In a real SaaS, /login might redirect to a generic login that asks for workspace */}
 
               {/* 404 Not Found Route */}
               <Route path="*" element={<NotFound />} />

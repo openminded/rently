@@ -24,8 +24,38 @@ export default function Login() {
         setIsLoading(true);
 
         try {
-            await login(username, password);
-            navigate(from, { replace: true });
+            const user = await login(username, password);
+
+            // Smart Redirect
+            if (user.business?.slug) {
+                const target = `/${user.business.slug}/app/dashboard`;
+                // If 'from' is generic or invalid, use target
+                const isGeneric = !from || from === '/app' || from === '/login' || from === '/';
+                if (isGeneric) {
+                    navigate(target, { replace: true });
+                } else {
+                    navigate(from, { replace: true });
+                }
+            } else if (user.role === 'SUPERADMIN') {
+                // Superadmin might not have a business attached directly or can access all
+                // For now, redirect to first business or specific admin route?
+                // Since we don't have /admin yet, we might need to handle this.
+                // Maybe check if businessId is set?
+                if (user.businessId) {
+                    // Fetch slug?
+                    // We included business in authController now.
+                    // If business is null but role is superadmin...
+                    // Maybe redirect to a business selection page? (Not built)
+                    // Fallback to Main Landing for now
+                    navigate('/');
+                } else {
+                    navigate('/');
+                }
+            } else {
+                // Should not happen for normal users
+                navigate('/');
+            }
+
         } catch (err: any) {
             setError(err.message || t('auth.failed'));
         } finally {

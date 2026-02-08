@@ -7,8 +7,12 @@ export const returnController = {
     getActiveRentals: async (req: Request, res: Response) => {
         console.log("Hit getActiveRentals endpoint");
         try {
+
+            // @ts-ignore
+            const businessId = req.user?.businessId;
             const rentals = await prisma.transaction.findMany({
                 where: {
+                    businessId,
                     status: {
                         in: ['BOOKED', 'RENTED', 'RETURNED'] // Include RETURNED for history/audit before completion? Or just active.
                         // Let's stick to active for the "Returns" workspace, maybe a toggle for history later.
@@ -49,8 +53,10 @@ export const returnController = {
     getRentalById: async (req: Request, res: Response) => {
         try {
             const { id } = req.params;
-            const rental = await prisma.transaction.findUnique({
-                where: { id: Number(id) },
+            // @ts-ignore
+            const businessId = req.user?.businessId;
+            const rental = await prisma.transaction.findFirst({
+                where: { id: Number(id), businessId },
                 include: {
                     customer: true,
                     items: {
@@ -94,8 +100,10 @@ export const returnController = {
             console.log('Return data:', { returnDate, fines, itemsStatus, payment });
 
             // 0. Validation: Enforce Full Payment
-            const existingTx = await prisma.transaction.findUnique({ where: { id: Number(id) } });
-            if (!existingTx) return res.status(404).json({ error: 'Transaction not found' });
+            // @ts-ignore
+            const businessId = req.user?.businessId;
+            const existingTx = await prisma.transaction.findFirst({ where: { id: Number(id), businessId } });
+            if (!existingTx) return res.status(404).json({ error: 'Transaction not found or access denied' });
 
             const remainingDebt = existingTx.totalAmount - existingTx.paidAmount;
             const totalFines = (fines || []).reduce((sum: number, f: any) => sum + f.amount, 0);
@@ -162,6 +170,7 @@ export const returnController = {
                     await tx.payment.create({
                         data: {
                             transactionId: Number(id),
+                            businessId,
                             amount: payment.amount,
                             paymentMethodId: payment.methodId,
                             note: payment.note || 'Fine/Late Payment',

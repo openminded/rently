@@ -19,7 +19,7 @@ interface TransactionsProps {
 }
 
 export default function Transactions({ type: initialType }: TransactionsProps) {
-    const { hasRole, token } = useAuth();
+    const { hasRole, token, business } = useAuth();
     const { t } = useLanguage();
     const { type: urlType } = useParams();
     const navigate = useNavigate();
@@ -518,7 +518,8 @@ export default function Transactions({ type: initialType }: TransactionsProps) {
         const filteredTargets = reminderTargets.filter(t => selectedTargetPhones.includes(t.phone));
 
         // Navigate to broadcast with state
-        navigate('/app/broadcast', {
+        const basePath = business ? `/${business.slug}/app` : '/app';
+        navigate(`${basePath}/broadcast`, {
             state: {
                 targets: filteredTargets,
                 content: reminderData?.content,
@@ -575,7 +576,10 @@ export default function Transactions({ type: initialType }: TransactionsProps) {
                         {tabs.map((tab) => (
                             <button
                                 key={tab.id}
-                                onClick={() => navigate(`/app/transactions/${tab.id}`)}
+                                onClick={() => {
+                                    const basePath = business ? `/${business.slug}/app` : '/app';
+                                    navigate(`${basePath}/transactions/${tab.id}`);
+                                }}
                                 className={clsx(
                                     "px-3 py-2 rounded-md text-xs font-bold transition-all whitespace-nowrap flex items-center gap-2",
                                     currentType === tab.id ? "bg-white shadow-sm text-gray-900" : "text-gray-500 hover:text-gray-700 hover:bg-gray-50/50"

@@ -12,9 +12,9 @@ interface BrandSettings {
 }
 
 export function useBrand() {
-    const { token } = useAuth();
+    const { token, business } = useAuth();
     const [brand, setBrand] = useState<BrandSettings>({
-        name: 'Werently', // Default
+        name: business?.name || 'Werently',
         logo: '',
         loading: true
     });
@@ -22,9 +22,19 @@ export function useBrand() {
     useEffect(() => {
         const fetchBrand = async () => {
             try {
+                // If we are in a business context, use that business's branding
+                if (business) {
+                    setBrand({
+                        name: business.name,
+                        logo: '', // TODO: Add logo to Business model or fetch from settings
+                        loading: false
+                    });
+                    return;
+                }
+
                 let data: any = null;
 
-                // 1. Try Authenticated Fetch if token exists
+                // 1. Try Authenticated Fetch if token exists (and no specific business context yet)
                 if (token) {
                     const res = await fetch(`${API_URL}/settings`, {
                         headers: { 'Authorization': `Bearer ${token}` }
@@ -34,7 +44,7 @@ export function useBrand() {
                     }
                 }
 
-                // 2. Fallback to Public Fetch if no token or auth failed
+                // 2. Fallback to Public Fetch
                 if (!data) {
                     const res = await fetch(`${API_URL}/settings/public`);
                     if (res.ok) {
@@ -49,7 +59,6 @@ export function useBrand() {
                         loading: false
                     });
                 } else {
-                    // Keep default but stop loading
                     setBrand(prev => ({ ...prev, loading: false }));
                 }
             } catch (e) {
@@ -59,7 +68,7 @@ export function useBrand() {
         };
 
         fetchBrand();
-    }, [token]);
+    }, [token, business]);
 
     return brand;
 }

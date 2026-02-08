@@ -11,10 +11,13 @@ import { Lock } from 'lucide-react';
 
 export default function Layout() {
     const location = useLocation();
-    const { user, logout, hasRole } = useAuth();
+    const { user, logout, hasRole, business } = useAuth();
     const { t } = useLanguage();
     const { currentShift } = useShift();
     const [isCloseShiftOpen, setIsCloseShiftOpen] = useState(false);
+
+    // Dynamic Base Path
+    const basePath = business ? `/${business.slug}/app` : '/app'; // Fallback if no business (e.g. admin root?)
 
     // State for Mobile and Desktop sidebars
     const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -33,10 +36,10 @@ export default function Layout() {
         setOpenGroups(prev => ({ ...prev, [group]: !prev[group] }));
     };
 
-    const isMasterActive = location.pathname.startsWith('/app/masters');
-    const isReferralActive = location.pathname.startsWith('/app/referral');
-    const isTransactionActive = location.pathname.startsWith('/app/transactions');
-    const isInventoryActive = location.pathname.startsWith('/app/inventory');
+    const isMasterActive = location.pathname.startsWith(`${basePath}/masters`);
+    const isReferralActive = location.pathname.startsWith(`${basePath}/referral`);
+    const isTransactionActive = location.pathname.startsWith(`${basePath}/transactions`);
+    const isInventoryActive = location.pathname.startsWith(`${basePath}/inventory`);
 
     const { name: brandName, logo: brandLogo } = useBrand();
 
@@ -92,13 +95,11 @@ export default function Layout() {
                 </div>
 
                 <nav className="flex-1 px-4 space-y-1 overflow-y-auto">
-                    {/* ... Navigation Items (Same as before) ... */}
-                    {/* Re-using existing structure but ensuring clicks close menu on mobile */}
-
-                    <NavLink to="/app" end onClick={() => setMobileMenuOpen(false)} className={({ isActive }) => clsx("flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors", isActive ? "bg-gray-900 text-white" : "text-gray-500 hover:bg-gray-100 hover:text-gray-900")}>
+                    {/* Dashboard & POS */}
+                    <NavLink to={basePath} end onClick={() => setMobileMenuOpen(false)} className={({ isActive }) => clsx("flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors", isActive ? "bg-gray-900 text-white" : "text-gray-500 hover:bg-gray-100 hover:text-gray-900")}>
                         <LayoutDashboard size={18} /> {t('menu.dashboard')}
                     </NavLink>
-                    <NavLink to="/app/pos" onClick={() => setMobileMenuOpen(false)} className={({ isActive }) => clsx("flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors", isActive ? "bg-gray-900 text-white" : "text-gray-500 hover:bg-gray-100 hover:text-gray-900")}>
+                    <NavLink to={`${basePath}/pos`} onClick={() => setMobileMenuOpen(false)} className={({ isActive }) => clsx("flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors", isActive ? "bg-gray-900 text-white" : "text-gray-500 hover:bg-gray-100 hover:text-gray-900")}>
                         <ShoppingCart size={18} /> {t('menu.pos')}
                     </NavLink>
 
@@ -116,13 +117,13 @@ export default function Layout() {
 
                         {openGroups.inventory && (
                             <div className="pl-10 space-y-1 mt-1">
-                                <NavLink to="/app/inventory/showcase" onClick={() => setMobileMenuOpen(false)} className={({ isActive }) => clsx("block py-1.5 text-sm transition-colors", isActive ? "text-gray-900 font-medium" : "text-gray-500 hover:text-gray-900")}>
+                                <NavLink to={`${basePath}/inventory/showcase`} onClick={() => setMobileMenuOpen(false)} className={({ isActive }) => clsx("block py-1.5 text-sm transition-colors", isActive ? "text-gray-900 font-medium" : "text-gray-500 hover:text-gray-900")}>
                                     {t('menu.showcase')}
                                 </NavLink>
-                                <NavLink to="/app/inventory/catalog" onClick={() => setMobileMenuOpen(false)} className={({ isActive }) => clsx("block py-1.5 text-sm transition-colors", isActive ? "text-gray-900 font-medium" : "text-gray-500 hover:text-gray-900")}>
+                                <NavLink to={`${basePath}/inventory/catalog`} onClick={() => setMobileMenuOpen(false)} className={({ isActive }) => clsx("block py-1.5 text-sm transition-colors", isActive ? "text-gray-900 font-medium" : "text-gray-500 hover:text-gray-900")}>
                                     {t('menu.catalog')}
                                 </NavLink>
-                                <NavLink to="/app/inventory/history" onClick={() => setMobileMenuOpen(false)} className={({ isActive }) => clsx("block py-1.5 text-sm transition-colors", isActive ? "text-gray-900 font-medium" : "text-gray-500 hover:text-gray-900")}>
+                                <NavLink to={`${basePath}/inventory/history`} onClick={() => setMobileMenuOpen(false)} className={({ isActive }) => clsx("block py-1.5 text-sm transition-colors", isActive ? "text-gray-900 font-medium" : "text-gray-500 hover:text-gray-900")}>
                                     {t('menu.history')}
                                 </NavLink>
                             </div>
@@ -130,7 +131,7 @@ export default function Layout() {
                     </div>
 
                     {/* Laundry Menu */}
-                    <NavLink to="/app/laundry" onClick={() => setMobileMenuOpen(false)} className={({ isActive }) => clsx("flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors mt-2", isActive ? "bg-purple-600 text-white" : "text-gray-500 hover:bg-gray-100 hover:text-gray-900")}>
+                    <NavLink to={`${basePath}/laundry`} onClick={() => setMobileMenuOpen(false)} className={({ isActive }) => clsx("flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors mt-2", isActive ? "bg-purple-600 text-white" : "text-gray-500 hover:bg-gray-100 hover:text-gray-900")}>
                         <Package2 size={18} /> {t('menu.laundry')}
                     </NavLink>
 
@@ -148,19 +149,19 @@ export default function Layout() {
 
                         {openGroups.transactions && (
                             <div className="pl-10 space-y-1 mt-1">
-                                <NavLink to="/app/transactions/booking" onClick={() => setMobileMenuOpen(false)} className={({ isActive }) => clsx("block py-1.5 text-sm transition-colors", isActive ? "text-orange-600 font-medium" : "text-gray-500 hover:text-gray-900")}>
+                                <NavLink to={`${basePath}/transactions/booking`} onClick={() => setMobileMenuOpen(false)} className={({ isActive }) => clsx("block py-1.5 text-sm transition-colors", isActive ? "text-orange-600 font-medium" : "text-gray-500 hover:text-gray-900")}>
                                     {t('menu.booking')}
                                 </NavLink>
-                                <NavLink to="/app/transactions/waiting-pickup" onClick={() => setMobileMenuOpen(false)} className={({ isActive }) => clsx("block py-1.5 text-sm transition-colors", isActive ? "text-blue-600 font-medium" : "text-gray-500 hover:text-gray-900")}>
+                                <NavLink to={`${basePath}/transactions/waiting-pickup`} onClick={() => setMobileMenuOpen(false)} className={({ isActive }) => clsx("block py-1.5 text-sm transition-colors", isActive ? "text-blue-600 font-medium" : "text-gray-500 hover:text-gray-900")}>
                                     {t('menu.waitingPickup')}
                                 </NavLink>
-                                <NavLink to="/app/transactions/rent" onClick={() => setMobileMenuOpen(false)} className={({ isActive }) => clsx("block py-1.5 text-sm transition-colors", isActive ? "text-green-600 font-medium" : "text-gray-500 hover:text-gray-900")}>
+                                <NavLink to={`${basePath}/transactions/rent`} onClick={() => setMobileMenuOpen(false)} className={({ isActive }) => clsx("block py-1.5 text-sm transition-colors", isActive ? "text-green-600 font-medium" : "text-gray-500 hover:text-gray-900")}>
                                     {t('menu.rentActive')}
                                 </NavLink>
-                                <NavLink to="/app/transactions/need-return" onClick={() => setMobileMenuOpen(false)} className={({ isActive }) => clsx("block py-1.5 text-sm transition-colors", isActive ? "text-red-600 font-medium" : "text-gray-500 hover:text-gray-900")}>
+                                <NavLink to={`${basePath}/transactions/need-return`} onClick={() => setMobileMenuOpen(false)} className={({ isActive }) => clsx("block py-1.5 text-sm transition-colors", isActive ? "text-red-600 font-medium" : "text-gray-500 hover:text-gray-900")}>
                                     {t('menu.needReturn')}
                                 </NavLink>
-                                <NavLink to="/app/transactions/completed" onClick={() => setMobileMenuOpen(false)} className={({ isActive }) => clsx("block py-1.5 text-sm transition-colors", isActive ? "text-gray-900 font-medium" : "text-gray-500 hover:text-gray-900")}>
+                                <NavLink to={`${basePath}/transactions/completed`} onClick={() => setMobileMenuOpen(false)} className={({ isActive }) => clsx("block py-1.5 text-sm transition-colors", isActive ? "text-gray-900 font-medium" : "text-gray-500 hover:text-gray-900")}>
                                     {t('menu.completed')}
                                 </NavLink>
                             </div>
@@ -170,10 +171,10 @@ export default function Layout() {
                     {/* Finance Menu */}
                     {hasRole(['SUPERADMIN', 'OWNER']) && (
                         <>
-                            <NavLink to="/app/finance" onClick={() => setMobileMenuOpen(false)} className={({ isActive }) => clsx("flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors mt-2", isActive ? "bg-emerald-600 text-white" : "text-gray-500 hover:bg-gray-100 hover:text-gray-900")}>
+                            <NavLink to={`${basePath}/finance`} onClick={() => setMobileMenuOpen(false)} className={({ isActive }) => clsx("flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors mt-2", isActive ? "bg-emerald-600 text-white" : "text-gray-500 hover:bg-gray-100 hover:text-gray-900")}>
                                 <DollarSign size={18} /> {t('menu.finance')}
                             </NavLink>
-                            <NavLink to="/app/shifts" onClick={() => setMobileMenuOpen(false)} className={({ isActive }) => clsx("flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors mt-1", isActive ? "bg-indigo-600 text-white" : "text-gray-500 hover:bg-gray-100 hover:text-gray-900")}>
+                            <NavLink to={`${basePath}/shifts`} onClick={() => setMobileMenuOpen(false)} className={({ isActive }) => clsx("flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors mt-1", isActive ? "bg-indigo-600 text-white" : "text-gray-500 hover:bg-gray-100 hover:text-gray-900")}>
                                 <Lock size={18} /> Shifts
                             </NavLink>
                         </>
@@ -193,10 +194,10 @@ export default function Layout() {
 
                         {openGroups.referral && (
                             <div className="pl-10 space-y-1 mt-1">
-                                <NavLink to="/app/referral" end onClick={() => setMobileMenuOpen(false)} className={({ isActive }) => clsx("block py-1.5 text-sm transition-colors", isActive ? "text-blue-600 font-medium" : "text-gray-500 hover:text-gray-900")}>
+                                <NavLink to={`${basePath}/referral`} end onClick={() => setMobileMenuOpen(false)} className={({ isActive }) => clsx("block py-1.5 text-sm transition-colors", isActive ? "text-blue-600 font-medium" : "text-gray-500 hover:text-gray-900")}>
                                     {t('referral.management')}
                                 </NavLink>
-                                <NavLink to="/app/referral/history" onClick={() => setMobileMenuOpen(false)} className={({ isActive }) => clsx("block py-1.5 text-sm transition-colors", isActive ? "text-blue-600 font-medium" : "text-gray-500 hover:text-gray-900")}>
+                                <NavLink to={`${basePath}/referral/history`} onClick={() => setMobileMenuOpen(false)} className={({ isActive }) => clsx("block py-1.5 text-sm transition-colors", isActive ? "text-blue-600 font-medium" : "text-gray-500 hover:text-gray-900")}>
                                     {t('referral.history')}
                                 </NavLink>
                             </div>
@@ -205,7 +206,7 @@ export default function Layout() {
 
                     {/* User Management Menu (Owner, Superadmin, Supervisor) */}
                     {hasRole(['SUPERADMIN', 'OWNER', 'SUPERVISOR']) && (
-                        <NavLink to="/app/users" onClick={() => setMobileMenuOpen(false)} className={({ isActive }) => clsx("flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors mt-2", isActive ? "bg-indigo-600 text-white" : "text-gray-500 hover:bg-gray-100 hover:text-gray-900")}>
+                        <NavLink to={`${basePath}/users`} onClick={() => setMobileMenuOpen(false)} className={({ isActive }) => clsx("flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors mt-2", isActive ? "bg-indigo-600 text-white" : "text-gray-500 hover:bg-gray-100 hover:text-gray-900")}>
                             <User size={18} /> {t('menu.userManagement')}
                         </NavLink>
                     )}
@@ -224,32 +225,32 @@ export default function Layout() {
 
                         {openGroups.masters && (
                             <div className="pl-10 space-y-1 mt-1">
-                                <NavLink to="/app/masters/categories" onClick={() => setMobileMenuOpen(false)} className={({ isActive }) => clsx("block py-1.5 text-sm transition-colors", isActive ? "text-gray-900 font-medium" : "text-gray-500 hover:text-gray-900")}>
+                                <NavLink to={`${basePath}/masters/categories`} onClick={() => setMobileMenuOpen(false)} className={({ isActive }) => clsx("block py-1.5 text-sm transition-colors", isActive ? "text-gray-900 font-medium" : "text-gray-500 hover:text-gray-900")}>
                                     {t('menu.categories')}
                                 </NavLink>
-                                <NavLink to="/app/masters/brands" onClick={() => setMobileMenuOpen(false)} className={({ isActive }) => clsx("block py-1.5 text-sm transition-colors", isActive ? "text-gray-900 font-medium" : "text-gray-500 hover:text-gray-900")}>
+                                <NavLink to={`${basePath}/masters/brands`} onClick={() => setMobileMenuOpen(false)} className={({ isActive }) => clsx("block py-1.5 text-sm transition-colors", isActive ? "text-gray-900 font-medium" : "text-gray-500 hover:text-gray-900")}>
                                     {t('menu.brands')}
                                 </NavLink>
-                                <NavLink to="/app/masters/colors" onClick={() => setMobileMenuOpen(false)} className={({ isActive }) => clsx("block py-1.5 text-sm transition-colors", isActive ? "text-gray-900 font-medium" : "text-gray-500 hover:text-gray-900")}>
+                                <NavLink to={`${basePath}/masters/colors`} onClick={() => setMobileMenuOpen(false)} className={({ isActive }) => clsx("block py-1.5 text-sm transition-colors", isActive ? "text-gray-900 font-medium" : "text-gray-500 hover:text-gray-900")}>
                                     {t('menu.colors')}
                                 </NavLink>
-                                <NavLink to="/app/masters/sizes" onClick={() => setMobileMenuOpen(false)} className={({ isActive }) => clsx("block py-1.5 text-sm transition-colors", isActive ? "text-gray-900 font-medium" : "text-gray-500 hover:text-gray-900")}>
+                                <NavLink to={`${basePath}/masters/sizes`} onClick={() => setMobileMenuOpen(false)} className={({ isActive }) => clsx("block py-1.5 text-sm transition-colors", isActive ? "text-gray-900 font-medium" : "text-gray-500 hover:text-gray-900")}>
                                     {t('menu.sizes')}
                                 </NavLink>
-                                <NavLink to="/app/masters/customers" onClick={() => setMobileMenuOpen(false)} className={({ isActive }) => clsx("block py-1.5 text-sm transition-colors", isActive ? "text-gray-900 font-medium" : "text-gray-500 hover:text-gray-900")}>
+                                <NavLink to={`${basePath}/masters/customers`} onClick={() => setMobileMenuOpen(false)} className={({ isActive }) => clsx("block py-1.5 text-sm transition-colors", isActive ? "text-gray-900 font-medium" : "text-gray-500 hover:text-gray-900")}>
                                     {t('menu.customers')}
                                 </NavLink>
-                                <NavLink to="/app/masters/payments" onClick={() => setMobileMenuOpen(false)} className={({ isActive }) => clsx("block py-1.5 text-sm transition-colors", isActive ? "text-gray-900 font-medium" : "text-gray-500 hover:text-gray-900")}>
+                                <NavLink to={`${basePath}/masters/payments`} onClick={() => setMobileMenuOpen(false)} className={({ isActive }) => clsx("block py-1.5 text-sm transition-colors", isActive ? "text-gray-900 font-medium" : "text-gray-500 hover:text-gray-900")}>
                                     {t('menu.payments')}
                                 </NavLink>
-                                <NavLink to="/app/masters/violations" onClick={() => setMobileMenuOpen(false)} className={({ isActive }) => clsx("block py-1.5 text-sm transition-colors", isActive ? "text-gray-900 font-medium" : "text-gray-500 hover:text-gray-900")}>
+                                <NavLink to={`${basePath}/masters/violations`} onClick={() => setMobileMenuOpen(false)} className={({ isActive }) => clsx("block py-1.5 text-sm transition-colors", isActive ? "text-gray-900 font-medium" : "text-gray-500 hover:text-gray-900")}>
                                     {t('menu.violations')}
                                 </NavLink>
-                                <NavLink to="/app/masters/laundry-partners" onClick={() => setMobileMenuOpen(false)} className={({ isActive }) => clsx("block py-1.5 text-sm transition-colors", isActive ? "text-gray-900 font-medium" : "text-gray-500 hover:text-gray-900")}>
+                                <NavLink to={`${basePath}/masters/laundry-partners`} onClick={() => setMobileMenuOpen(false)} className={({ isActive }) => clsx("block py-1.5 text-sm transition-colors", isActive ? "text-gray-900 font-medium" : "text-gray-500 hover:text-gray-900")}>
                                     {t('menu.laundryPartners')}
                                 </NavLink>
 
-                                <NavLink to="/app/masters/deposit-variants" onClick={() => setMobileMenuOpen(false)} className={({ isActive }) => clsx("block py-1.5 text-sm transition-colors", isActive ? "text-gray-900 font-medium" : "text-gray-500 hover:text-gray-900")}>
+                                <NavLink to={`${basePath}/masters/deposit-variants`} onClick={() => setMobileMenuOpen(false)} className={({ isActive }) => clsx("block py-1.5 text-sm transition-colors", isActive ? "text-gray-900 font-medium" : "text-gray-500 hover:text-gray-900")}>
                                     {t('menu.depositVariants')}
                                 </NavLink>
                             </div>
@@ -279,16 +280,16 @@ export default function Layout() {
 
                             {openGroups.settings && (
                                 <div className="pl-10 space-y-1 animate-in slide-in-from-top-2 duration-200">
-                                    <NavLink to="/app/settings/app-config" onClick={() => setMobileMenuOpen(false)} className={({ isActive }) => clsx("block py-1.5 text-sm transition-colors", isActive ? "text-gray-900 font-medium" : "text-gray-500 hover:text-gray-900")}>
+                                    <NavLink to={`${basePath}/settings/app-config`} onClick={() => setMobileMenuOpen(false)} className={({ isActive }) => clsx("block py-1.5 text-sm transition-colors", isActive ? "text-gray-900 font-medium" : "text-gray-500 hover:text-gray-900")}>
                                         {t('menu.appConfig')}
                                     </NavLink>
                                     {hasRole(['SUPERADMIN', 'SUPERVISOR']) && (
-                                        <NavLink to="/app/settings/backup-restore" onClick={() => setMobileMenuOpen(false)} className={({ isActive }) => clsx("block py-1.5 text-sm transition-colors", isActive ? "text-gray-900 font-medium" : "text-gray-500 hover:text-gray-900")}>
+                                        <NavLink to={`${basePath}/settings/backup-restore`} onClick={() => setMobileMenuOpen(false)} className={({ isActive }) => clsx("block py-1.5 text-sm transition-colors", isActive ? "text-gray-900 font-medium" : "text-gray-500 hover:text-gray-900")}>
                                             {t('menu.backupRestore')}
                                         </NavLink>
                                     )}
                                     {hasRole(['SUPERADMIN', 'OWNER']) && (
-                                        <NavLink to="/app/settings/brand" onClick={() => setMobileMenuOpen(false)} className={({ isActive }) => clsx("block py-1.5 text-sm transition-colors", isActive ? "text-gray-900 font-medium" : "text-gray-500 hover:text-gray-900")}>
+                                        <NavLink to={`${basePath}/settings/brand`} onClick={() => setMobileMenuOpen(false)} className={({ isActive }) => clsx("block py-1.5 text-sm transition-colors", isActive ? "text-gray-900 font-medium" : "text-gray-500 hover:text-gray-900")}>
                                             {t('menu.brandIdentity')}
                                         </NavLink>
                                     )}
@@ -302,7 +303,7 @@ export default function Layout() {
                         <div className="pt-2">
                             <button
                                 onClick={() => toggleGroup('broadcast')}
-                                className={clsx("w-full flex items-center justify-between px-3 py-2.5 rounded-lg text-sm font-medium transition-colors", location.pathname.startsWith('/app/broadcast') ? "text-gray-900 bg-gray-50" : "text-gray-500 hover:bg-gray-100")}
+                                className={clsx("w-full flex items-center justify-between px-3 py-2.5 rounded-lg text-sm font-medium transition-colors", location.pathname.startsWith(`${basePath}/broadcast`) ? "text-gray-900 bg-gray-50" : "text-gray-500 hover:bg-gray-100")}
                             >
                                 <div className="flex items-center gap-3">
                                     <MessageSquare size={18} className="text-purple-600" /> WhatsApp
@@ -312,13 +313,13 @@ export default function Layout() {
 
                             {openGroups.broadcast && (
                                 <div className="pl-10 space-y-1 mt-1">
-                                    <NavLink to="/app/broadcast/connection" onClick={() => setMobileMenuOpen(false)} className={({ isActive }) => clsx("block py-1.5 text-sm transition-colors", isActive ? "text-purple-600 font-medium" : "text-gray-500 hover:text-gray-900")}>
+                                    <NavLink to={`${basePath}/broadcast/connection`} onClick={() => setMobileMenuOpen(false)} className={({ isActive }) => clsx("block py-1.5 text-sm transition-colors", isActive ? "text-purple-600 font-medium" : "text-gray-500 hover:text-gray-900")}>
                                         Connection
                                     </NavLink>
-                                    <NavLink to="/app/broadcast/templates" onClick={() => setMobileMenuOpen(false)} className={({ isActive }) => clsx("block py-1.5 text-sm transition-colors", isActive ? "text-purple-600 font-medium" : "text-gray-500 hover:text-gray-900")}>
+                                    <NavLink to={`${basePath}/broadcast/templates`} onClick={() => setMobileMenuOpen(false)} className={({ isActive }) => clsx("block py-1.5 text-sm transition-colors", isActive ? "text-purple-600 font-medium" : "text-gray-500 hover:text-gray-900")}>
                                         Templates
                                     </NavLink>
-                                    <NavLink to="/app/broadcast/campaigns" onClick={() => setMobileMenuOpen(false)} className={({ isActive }) => clsx("block py-1.5 text-sm transition-colors", isActive ? "text-purple-600 font-medium" : "text-gray-500 hover:text-gray-900")}>
+                                    <NavLink to={`${basePath}/broadcast/campaigns`} onClick={() => setMobileMenuOpen(false)} className={({ isActive }) => clsx("block py-1.5 text-sm transition-colors", isActive ? "text-purple-600 font-medium" : "text-gray-500 hover:text-gray-900")}>
                                         Campaigns
                                     </NavLink>
                                 </div>

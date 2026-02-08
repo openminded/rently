@@ -55,6 +55,7 @@ export const shiftController = {
             const shift = await prisma.shift.create({
                 data: {
                     userId,
+                    businessId: (req as any).user?.businessId,
                     startCash: parseFloat(startCash || 0),
                     notes,
                     status: 'OPEN'
@@ -74,8 +75,10 @@ export const shiftController = {
             const { id } = req.params;
             const { actualCash, notes } = req.body;
 
-            const shift = await prisma.shift.findUnique({
-                where: { id: parseInt(id as string) }
+            const businessId = (req as any).user?.businessId;
+
+            const shift = await prisma.shift.findFirst({
+                where: { id: parseInt(id as string), businessId }
             });
 
             if (!shift || shift.status === 'CLOSED') {
@@ -115,7 +118,9 @@ export const shiftController = {
     getHistory: async (req: Request, res: Response) => {
         try {
             const { userId, status } = req.query;
-            const where: any = {};
+            // @ts-ignore
+            const businessId = req.user?.businessId;
+            const where: any = { businessId };
 
             if (status) where.status = status as string;
             if (userId) where.userId = parseInt(userId as string);

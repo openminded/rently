@@ -19,6 +19,7 @@ import { id as localeId } from 'date-fns/locale';
 
 import { API_BASE_URL, getImageUrl } from '../config/api';
 import { useBrand } from '../hooks/useBrand';
+import { useAuth } from '../context/AuthContext';
 
 const API_BASE = API_BASE_URL;
 
@@ -215,13 +216,23 @@ export default function LandingPage() {
 
     const navigate = useNavigate();
     const brand = useBrand();
+    const { business, user } = useAuth(); // business is resolved from slug
+    // We can use business.name directly, or fetch settings.
+    // settings/public?businessId=... will give specific branding if set in DB.
+
+    // Note: useBrand hook matches AuthContext.business, so brand.name should be correct.
+    // But we need appSettings for Hero, etc.
 
     useEffect(() => {
+        if (!business) return; // Wait for business context (or 404 handled by AuthContext if we were strict, but here we just wait)
+
+        const bid = business.id;
+
         // Fetch Settings & Items in parallel
         Promise.all([
-            fetch(`${API_BASE}/public/items?onlyWithImages=true`).then(res => res.json()),
-            fetch(`${API_BASE}/settings/public`).then(res => res.json()),
-            fetch(`${API_BASE}/public/categories`).then(res => res.json())
+            fetch(`${API_BASE}/public/items?onlyWithImages=true&businessId=${bid}`).then(res => res.json()),
+            fetch(`${API_BASE}/settings/public?businessId=${bid}`).then(res => res.json()),
+            fetch(`${API_BASE}/public/categories?businessId=${bid}`).then(res => res.json())
         ]).then(([itemsData, settingsData, categoriesData]) => {
             // Check if itemsData contains 'items' property (pagination structure) or is array
             const allItems = itemsData.items || itemsData;
@@ -233,7 +244,13 @@ export default function LandingPage() {
             console.error("Gagal memuat data", err);
             setLoading(false);
         });
-    }, []);
+    }, [business]); // Re-run when business changes
+
+    // Handle No Business (e.g. Loading or Error)
+    if (!business && loading) return <div className="min-h-screen flex items-center justify-center bg-[#FFF8F0] text-[#4A3B32] font-bold">Memuat Toko...</div>;
+    // If not loading and no business, AuthContext/Router should have handled it, or we show 404
+    if (!business && !loading) return <div className="min-h-screen flex items-center justify-center bg-[#FFF8F0] text-[#4A3B32] font-bold">Toko Tidak Ditemukan</div>;
+
 
     const scrollToSection = (id: string) => {
         document.getElementById(id)?.scrollIntoView({ behavior: 'smooth' });
@@ -243,7 +260,7 @@ export default function LandingPage() {
 
     // GLOBAL TOGGLE CHECK
     if (appSettings.LANDING_ENABLE_GLOBAL === 'false') {
-        window.location.href = '/app/login';
+        window.location.href = business ? `/${business.slug}/app/login` : '/app/login';
         return null;
     }
 
@@ -873,7 +890,7 @@ export default function LandingPage() {
                                                         setReferralMsg('');
                                                     }}
                                                     className={`flex-1 px-5 py-3 rounded-2xl bg-slate-50 border-2 transition-all font-mono font-bold text-sm uppercase ${referralValid === true ? 'border-green-500' :
-                                                            referralValid === false ? 'border-red-500' : 'border-transparent'
+                                                        referralValid === false ? 'border-red-500' : 'border-transparent'
                                                         }`}
                                                     placeholder="CONTOH10"
                                                 />

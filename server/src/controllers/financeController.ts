@@ -16,12 +16,16 @@ export const financeController = {
             const end = new Date(endDate as string);
             end.setHours(23, 59, 59, 999); // Include the whole end day
 
+            // @ts-ignore
+            const businessId = req.user?.businessId;
+
             // Calculate Income (Total Paid Amount from Transactions)
             const incomeAgg = await prisma.transaction.aggregate({
                 _sum: {
                     paidAmount: true
                 },
                 where: {
+                    businessId,
                     createdAt: {
                         gte: start,
                         lte: end
@@ -36,6 +40,7 @@ export const financeController = {
                     amount: true
                 },
                 where: {
+                    businessId,
                     date: {
                         gte: start,
                         lte: end
@@ -62,7 +67,10 @@ export const financeController = {
     getIncome: async (req: Request, res: Response) => {
         try {
             const { startDate, endDate } = req.query;
+            // @ts-ignore
+            const businessId = req.user?.businessId;
             const where: any = {
+                businessId,
                 status: { not: 'CANCELLED' }
             };
 
@@ -98,7 +106,9 @@ export const financeController = {
     getExpenses: async (req: Request, res: Response) => {
         try {
             const { startDate, endDate } = req.query;
-            const where: any = {};
+            // @ts-ignore
+            const businessId = req.user?.businessId;
+            const where: any = { businessId };
 
             if (startDate && endDate) {
                 const start = new Date(startDate as string);
@@ -135,6 +145,8 @@ export const financeController = {
 
             const expense = await prisma.expense.create({
                 data: {
+                    // @ts-ignore
+                    businessId: req.user?.businessId,
                     type: 'MANUAL',
                     description,
                     amount: parseFloat(amount),
@@ -154,7 +166,11 @@ export const financeController = {
     // 5. Manage Expense Categories
     getCategories: async (req: Request, res: Response) => {
         try {
-            const categories = await prisma.expenseCategory.findMany();
+            // @ts-ignore
+            const businessId = req.user?.businessId;
+            const categories = await prisma.expenseCategory.findMany({
+                where: { businessId }
+            });
             res.json(categories);
         } catch (error) {
             console.error(error);
@@ -167,8 +183,10 @@ export const financeController = {
             const { name } = req.body;
             if (!name) return res.status(400).json({ error: 'Name is required' });
 
+            // @ts-ignore
+            const businessId = req.user?.businessId;
             const category = await prisma.expenseCategory.create({
-                data: { name }
+                data: { name, businessId }
             });
             res.status(201).json(category);
         } catch (error) {
@@ -180,6 +198,15 @@ export const financeController = {
     deleteCategory: async (req: Request, res: Response) => {
         try {
             const { id } = req.params;
+            // @ts-ignore
+            const businessId = req.user?.businessId;
+
+            // Verify ownership
+            const existing = await prisma.expenseCategory.findFirst({
+                where: { id: parseInt((id as string) || '0'), businessId }
+            });
+            if (!existing) return res.status(404).json({ error: 'Category not found' });
+
             await prisma.expenseCategory.delete({
                 where: { id: parseInt((id as string) || '0') }
             });
@@ -203,12 +230,16 @@ export const financeController = {
             const end = new Date(endDate as string);
             end.setHours(23, 59, 59, 999);
 
+            // @ts-ignore
+            const businessId = req.user?.businessId;
+
             const byCategory = await prisma.expense.groupBy({
                 by: ['categoryId'],
                 _sum: {
                     amount: true
                 },
                 where: {
+                    businessId,
                     date: {
                         gte: start,
                         lte: end
@@ -218,7 +249,7 @@ export const financeController = {
 
             // Need to join with category names manually or via separate query since groupBy doesn't support relation include directly nicely
             // Let's fetch categories mapping
-            const categories = await prisma.expenseCategory.findMany();
+            const categories = await prisma.expenseCategory.findMany({ where: { businessId } });
             const categoryMap = categories.reduce((acc: any, cat) => {
                 acc[cat.id] = cat.name;
                 return acc;

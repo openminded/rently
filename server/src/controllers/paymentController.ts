@@ -57,12 +57,16 @@ export const paymentController = {
 
                     // Create Payment record
                     let paymentMethod = await tx.paymentMethod.findFirst({
-                        where: { type: 'GATEWAY' }
+                        where: {
+                            type: 'GATEWAY',
+                            businessId: transaction.businessId
+                        }
                     });
 
                     await tx.payment.create({
                         data: {
                             transactionId: transaction.id,
+                            businessId: transaction.businessId,
                             amount: parseFloat(amount),
                             paymentMethodId: paymentMethod?.id || 0,
                             note: `Duitku QRIS (${suffix || 'General'}): ${reference}`,

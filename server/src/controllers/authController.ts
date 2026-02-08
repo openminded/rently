@@ -2,6 +2,7 @@ import type { Request, Response } from 'express';
 import prisma from '../prisma.js';
 import bcrypt from 'bcrypt';
 import jwt from 'jsonwebtoken';
+import { businessService } from '../services/businessService.js';
 
 const JWT_SECRET = process.env.JWT_SECRET || 'super-secret-key-change-me';
 
@@ -11,7 +12,8 @@ export const authController = {
             const { username, password } = req.body;
 
             const user = await prisma.user.findUnique({
-                where: { username }
+                where: { username },
+                include: { business: { select: { slug: true, name: true, id: true } } }
             });
 
             if (!user) {
@@ -24,7 +26,13 @@ export const authController = {
             }
 
             const token = jwt.sign(
-                { id: user.id, username: user.username, role: user.role, name: user.name },
+                {
+                    id: user.id,
+                    username: user.username,
+                    role: user.role,
+                    name: user.name,
+                    businessId: user.businessId
+                },
                 JWT_SECRET,
                 { expiresIn: '1d' } // 1 day session
             );
@@ -35,7 +43,9 @@ export const authController = {
                     id: user.id,
                     username: user.username,
                     role: user.role,
-                    name: user.name
+                    name: user.name,
+                    businessId: user.businessId,
+                    business: user.business
                 }
             });
 
@@ -51,5 +61,33 @@ export const authController = {
         const user = req.user;
         if (!user) return res.status(401).json({ error: 'Not authenticated' });
         res.json(user);
+    },
+
+    register: async (req: Request, res: Response) => {
+        try {
+            const { businessName, address, phone, ownerName, username, password } = req.body;
+
+            // Validation
+            if (!businessName || !ownerName || !username || !password) {
+                return res.status(400).json({ error: 'Missing required fields' });
+            }
+
+            const result = await businessService.registerBusiness({
+                businessName,
+                address,
+                phone,
+                ownerName,
+                username,
+                password
+            });
+
+            res.status(201).json(result);
+        } catch (error: any) {
+            console.error("Registration Error:", error);
+            if (error.message === 'Username already taken') {
+                return res.status(400).json({ error: 'Username already taken' });
+            }
+            res.status(500).json({ error: 'Registration failed' });
+        }
     }
 };

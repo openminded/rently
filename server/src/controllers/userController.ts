@@ -6,7 +6,11 @@ export const userController = {
     // List all users (excluding passwords)
     getUsers: async (req: Request, res: Response) => {
         try {
+            // @ts-ignore
+            const businessId = req.user?.businessId;
+
             const users = await prisma.user.findMany({
+                where: { businessId },
                 select: {
                     id: true,
                     username: true,
@@ -45,7 +49,9 @@ export const userController = {
                     username,
                     password: hashedPassword,
                     name,
-                    role
+                    role,
+                    // @ts-ignore
+                    businessId: req.user?.businessId
                 }
             });
 
@@ -69,6 +75,15 @@ export const userController = {
                 updateData.password = await bcrypt.hash(password, 10);
             }
 
+            // @ts-ignore
+            const businessId = req.user?.businessId;
+
+            // Verify ownership
+            const existing = await prisma.user.findFirst({
+                where: { id: Number(id), businessId }
+            });
+            if (!existing) return res.status(404).json({ error: 'User not found' });
+
             await prisma.user.update({
                 where: { id: Number(id) },
                 data: updateData
@@ -85,9 +100,13 @@ export const userController = {
     deleteUser: async (req: Request, res: Response) => {
         try {
             const { id } = req.params;
+            // @ts-ignore
+            const businessId = req.user?.businessId;
 
-            // Fetch user first
-            const targetUser = await prisma.user.findUnique({ where: { id: Number(id) } });
+            // Fetch user first (Scoped)
+            const targetUser = await prisma.user.findFirst({
+                where: { id: Number(id), businessId }
+            });
 
             if (!targetUser) {
                 return res.status(404).json({ error: 'User not found' });
