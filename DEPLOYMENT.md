@@ -30,22 +30,45 @@ Sebelum menjalankan script deployment untuk pertama kalinya (atau jika script di
 chmod +x deploy.sh deploy_frontend.sh
 ```
 
-## 4. Deploy Backend & Frontend
-Jalankan script berikut secara berurutan.
+## 4. Proses Deployment (Pilih Salah Satu)
 
-### Deploy Backend
-Script ini akan mengambil kode terbaru dari Git, install dependency backend, dan restart server Node.js.
+### A. STAGING (`werently.telaju.com`)
+Gunakan ini untuk testing sebelum masuk ke production.
 
-```bash
-./deploy.sh
-```
+1.  **Masuk ke Server**:
+    ```bash
+    cd /www/wwwroot/werently.telaju.com/server
+    ```
 
-### Deploy Frontend
-Script ini akan mem-build aplikasi React/Vite dan menyalin hasilnya ke folder publik server.
+2.  **Deploy Backend (Staging)**:
+    ```bash
+    ./deploy.sh
+    ```
 
-```bash
-./deploy_frontend.sh
-```
+3.  **Deploy Frontend (Staging)**:
+    ```bash
+    ./deploy_frontend.sh
+    ```
+
+---
+
+### B. PRODUCTION (`werently.com`)
+Gunakan ini untuk update live website utama.
+
+1.  **Masuk ke Server**:
+    ```bash
+    cd /www/wwwroot/werently.com/server
+    ```
+
+2.  **Deploy Backend (Production)**:
+    ```bash
+    ./deploy_prod.sh
+    ```
+
+3.  **Deploy Frontend (Production)**:
+    ```bash
+    ./deploy_frontend_prod.sh
+    ```
 
 ## Catatan Tambahan
 - **Images/Uploads**: Folder `server/uploads` digunakan untuk menyimpan gambar.

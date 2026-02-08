@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { ArrowRight, Check, Play, LayoutDashboard, MessageSquare, Calendar, ShieldCheck, BarChart3, Users, Globe, ShoppingCart, RotateCcw, TrendingUp, Smartphone, CreditCard, X, Maximize2, Calculator, Ticket } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import SEO from '../components/SEO';
 
 const TRANSLATIONS = {
     en: {
@@ -303,6 +304,8 @@ const TRANSLATIONS = {
     }
 };
 
+
+
 export default function WerentlyLanding() {
     const navigate = useNavigate();
     const [lang, setLang] = useState<'en' | 'id'>('id');
@@ -311,12 +314,32 @@ export default function WerentlyLanding() {
     const [simPrice, setSimPrice] = useState(1000000);
 
     useEffect(() => {
-        // Auto-detect language
         const userLang = navigator.language || navigator.languages[0];
         if (userLang.toLowerCase().includes('id')) {
             setLang('id');
         }
     }, []);
+
+    const t = TRANSLATIONS[lang];
+
+    const structuredData = {
+        "@context": "https://schema.org",
+        "@type": "SoftwareApplication",
+        "name": "Werently",
+        "applicationCategory": "BusinessApplication",
+        "operatingSystem": "Web, Android, iOS",
+        "offers": {
+            "@type": "Offer",
+            "price": "0",
+            "priceCurrency": "IDR"
+        },
+        "description": t.hero.description,
+        "aggregateRating": {
+            "@type": "AggregateRating",
+            "ratingValue": "4.8",
+            "ratingCount": "120"
+        }
+    };
 
     const handleWhatsAppCTA = (context?: string) => {
         let message = "";
@@ -337,8 +360,6 @@ export default function WerentlyLanding() {
 
         window.open(`https://wa.me/6285117535324?text=${encodeURIComponent(message)}`, '_blank');
     };
-
-    const t = TRANSLATIONS[lang];
 
     const featureIcons = [
         <LayoutDashboard size={24} strokeWidth={1.5} />,
@@ -375,6 +396,17 @@ export default function WerentlyLanding() {
 
     return (
         <div className="min-h-screen bg-white font-sans text-slate-900 selection:bg-indigo-100 selection:text-indigo-900">
+            <SEO
+                title={lang === 'id' ? "Aplikasi Kasir Laundry & Sewa Baju Terbaik" : "Best Laundry POS & Rental Management Software"}
+                description={lang === 'id'
+                    ? "Kelola bisnis sewa baju, kostum, dan laundry dalam satu aplikasi. Fitur lengkap: Stok, Kasir Online, Website Katalog, dan Laporan Keuangan."
+                    : "Manage your rental business, costumes, and laundry in one app. Features: Inventory, Online POS, Catalog Website, and Financial Reports."}
+                keywords="aplikasi laundry, software rental, kasir sewa baju, manajemen stok, werently, pos laundry"
+            />
+            <script type="application/ld+json">
+                {JSON.stringify(structuredData)}
+            </script>
+
             {/* Minimalist Navigation */}
             <nav className="fixed top-0 left-0 right-0 z-50 bg-white/80 backdrop-blur-xl border-b border-slate-100">
                 <div className="max-w-7xl mx-auto px-6 h-20 flex items-center justify-between">
@@ -657,24 +689,68 @@ export default function WerentlyLanding() {
                 </div>
             )}
 
-            {/* Simple Features Summary */}
-            <section id="features" className="py-24 px-6 max-w-7xl mx-auto">
-                <div className="text-center max-w-3xl mx-auto mb-20">
-                    <h2 className="text-indigo-600 font-bold tracking-wide uppercase text-xs lg:text-sm mb-3">{t.features.headerTitle}</h2>
-                    <h3 className="text-3xl lg:text-4xl font-bold text-slate-900 mb-6">{t.features.headerSubtitle}</h3>
-                    <p className="text-base lg:text-lg text-slate-500">{t.features.headerDesc}</p>
+            {/* Bento Grid Features */}
+            <section id="features" className="py-32 px-6 max-w-7xl mx-auto">
+                <div className="text-center max-w-3xl mx-auto mb-24">
+                    <h2 className="text-indigo-600 font-bold tracking-widest uppercase text-xs lg:text-sm mb-4">{t.features.headerTitle}</h2>
+                    <h3 className="text-4xl lg:text-6xl font-black text-slate-900 mb-8 tracking-tight">{t.features.headerSubtitle}</h3>
+                    <p className="text-lg text-slate-500 max-w-2xl mx-auto leading-relaxed">{t.features.headerDesc}</p>
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-6 lg:gap-8">
-                    {t.features.items.map((feature, idx) => (
-                        <div key={idx} className="p-8 rounded-3xl border border-slate-100 bg-white hover:shadow-xl hover:shadow-indigo-50 transition-all group border-b-4 hover:border-b-indigo-500">
-                            <div className={`w-12 h-12 ${featureColors[idx]} rounded-2xl flex items-center justify-center mb-6 border transition-all group-hover:scale-110`}>
-                                {featureIcons[idx]}
+                <div className="grid grid-cols-1 md:grid-cols-3 auto-rows-[minmax(280px,auto)] gap-6 lg:gap-8">
+                    {t.features.items.map((feature, idx) => {
+                        // Bento Grid Pattern: 0, 3, 7 are large (Span 2)
+                        const isLarge = idx === 0 || idx === 3 || idx === 7;
+
+                        return (
+                            <div
+                                key={idx}
+                                className={`
+                                    ${isLarge ? "md:col-span-2" : "md:col-span-1"} 
+                                    relative overflow-hidden rounded-[2.5rem] p-8 lg:p-10
+                                    bg-white border border-slate-100 shadow-sm
+                                    hover:shadow-2xl hover:shadow-indigo-100/50
+                                    transition-all duration-500 group hover:-translate-y-1
+                                    flex flex-col justify-between
+                                `}
+                            >
+                                {/* Decorational Background Gradients */}
+                                <div className="absolute top-0 right-0 w-64 h-64 bg-gradient-to-br from-slate-50 to-slate-100/50 rounded-full blur-3xl -mr-32 -mt-32 opacity-0 group-hover:opacity-100 transition-opacity duration-700"></div>
+
+                                <div className="relative z-10">
+                                    <div className="flex justify-between items-start mb-8">
+                                        <div className={`
+                                            w-16 h-16 rounded-2xl flex items-center justify-center
+                                            ${featureColors[idx]} 
+                                            shadow-sm group-hover:scale-110 transition-transform duration-500
+                                        `}>
+                                            {/* Clone element to increase size slightly if needed, or just rely on CSS scale */}
+                                            {featureIcons[idx]}
+                                        </div>
+                                        <div className="px-3 py-1 bg-slate-50 rounded-full border border-slate-100 text-[10px] font-bold uppercase tracking-widest text-slate-400 group-hover:bg-indigo-50 group-hover:text-indigo-600 group-hover:border-indigo-100 transition-colors">
+                                            {feature.tag}
+                                        </div>
+                                    </div>
+
+                                    <h4 className={`font-black text-slate-900 mb-4 tracking-tight group-hover:text-indigo-600 transition-colors ${isLarge ? 'text-3xl' : 'text-xl'}`}>
+                                        {feature.title}
+                                    </h4>
+                                    <p className="text-slate-500 leading-relaxed text-sm lg:text-base font-medium">
+                                        {feature.solution}
+                                    </p>
+                                </div>
+
+                                <div className="relative z-10 pt-8 mt-4 border-t border-slate-50 flex items-center gap-2">
+                                    <div className="w-6 h-6 rounded-full bg-indigo-50 flex items-center justify-center text-indigo-600 group-hover:bg-indigo-600 group-hover:text-white transition-colors">
+                                        <Check size={14} strokeWidth={4} />
+                                    </div>
+                                    <span className="text-xs font-bold uppercase tracking-wider text-slate-600 group-hover:text-indigo-600 transition-colors">
+                                        {feature.highlight}
+                                    </span>
+                                </div>
                             </div>
-                            <h4 className="text-lg font-black text-slate-900 mb-3 tracking-tight group-hover:text-indigo-600 transition-colors">{feature.title}</h4>
-                            <p className="text-slate-500 leading-relaxed text-xs">{feature.solution}</p>
-                        </div>
-                    ))}
+                        );
+                    })}
                 </div>
             </section>
 

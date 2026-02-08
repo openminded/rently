@@ -109,9 +109,16 @@ Agar `werently.com/api` mengarah ke port 3006.
 3.  Tambahkan blok ini di dalam `server { ... }`:
 
 ```nginx
-    # Proxy untuk API Backend
+    # 1. FRONTEND (React App)
+    location / {
+        root /www/wwwroot/werently.com/client/dist;
+        index index.html;
+        try_files $uri $uri/ /index.html;
+    }
+
+    # 2. BACKEND API
     location /api/ {
-        proxy_pass http://127.0.0.1:3006; # Port Production
+        proxy_pass http://127.0.0.1:3006;
         proxy_http_version 1.1;
         proxy_set_header Upgrade $http_upgrade;
         proxy_set_header Connection 'upgrade';
@@ -119,7 +126,7 @@ Agar `werently.com/api` mengarah ke port 3006.
         proxy_cache_bypass $http_upgrade;
     }
     
-    # Proxy untuk Gambar/Uploads
+    # 3. UPLOADS (Gambar)
     location /uploads/ {
         alias /www/wwwroot/werently.com/server/uploads/;
     }
