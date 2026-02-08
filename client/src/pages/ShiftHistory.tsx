@@ -117,8 +117,8 @@ export default function ShiftHistory() {
             sortable: true,
             cell: (row) => {
                 if (row.status === 'OPEN') return <span className="text-gray-400 text-xs">-</span>;
-                const val = row.variance;
-                if (val === null) return '-';
+                const val = row.variance ?? 0;
+                if (row.variance === null && row.status !== 'OPEN') return '-';
                 return (
                     <span className={clsx(
                         "px-2 py-1 rounded-full text-xs font-bold",

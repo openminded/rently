@@ -339,7 +339,7 @@ export default function Layout() {
                                     <span className="relative inline-flex rounded-full h-2 w-2 bg-green-500"></span>
                                 </span>
                             </div>
-                            <p className="text-sm font-bold text-indigo-900">Rp {currentShift.expectedCash.toLocaleString()}</p>
+                            <p className="text-sm font-bold text-indigo-900">Rp {(currentShift.expectedCash || 0).toLocaleString()}</p>
                             <button
                                 onClick={() => setIsCloseShiftOpen(true)}
                                 className="w-full mt-2 py-1.5 text-[10px] font-bold bg-white text-indigo-600 border border-indigo-200 rounded-lg hover:bg-indigo-600 hover:text-white transition-all shadow-sm"

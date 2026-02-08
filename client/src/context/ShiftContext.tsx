@@ -37,7 +37,7 @@ export const ShiftProvider: React.FC<{ children: React.ReactNode }> = ({ childre
                 headers: { 'Authorization': `Bearer ${token}` }
             });
             const data = await res.json();
-            if (data.isOpen) {
+            if (data && (data.isOpen || data.status === 'OPEN')) {
                 setCurrentShift(data);
             } else {
                 setCurrentShift(null);

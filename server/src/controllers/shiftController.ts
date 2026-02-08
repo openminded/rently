@@ -27,7 +27,7 @@ export const shiftController = {
             res.json({
                 isOpen: true,
                 ...shift,
-                expectedCash
+                expectedCash: Number(expectedCash || 0)
             });
 
         } catch (error: any) {

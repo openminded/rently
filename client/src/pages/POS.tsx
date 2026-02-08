@@ -579,7 +579,7 @@ export default function POS() {
 
                 {/* Item Grid */}
                 <div className="grid grid-cols-2 lg:grid-cols-3 gap-4 overflow-y-auto pr-2 pb-20">
-                    {items.map((item, index) => (
+                    {Array.isArray(items) && items.map((item, index) => (
                         <div
                             key={item.id}
                             ref={index === items.length - 1 ? lastItemRef : null}
