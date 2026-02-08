@@ -48,7 +48,8 @@ Script ini akan mem-build aplikasi React/Vite dan menyalin hasilnya ke folder pu
 ```
 
 ## Catatan Tambahan
-- **Images/Uploads**: Folder `server/uploads` digunakan untuk menyimpan gambar. Pastikan folder ini ada. Jika deploy pertama kali, Anda mungkin perlu upload ulang gambar via menu **App Config**.
+- **Images/Uploads**: Folder `server/uploads` digunakan untuk menyimpan gambar.
+    - **PENTING**: Gunakan fitur **Asset Backup** di menu Settings sebelum melakukan migrasi atau update besar untuk mengamankan foto produk. Anda bisa restore kembali file ZIP-nya setelah deployment selesai jika diperlukan.
 - **Logs**: Jika terjadi error, cek log menggunakan perintah:
   ```bash
   pm2 logs
