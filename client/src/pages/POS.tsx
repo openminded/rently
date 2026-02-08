@@ -557,7 +557,16 @@ export default function POS() {
     };
 
 
-    if (loading) return <div className="p-8">{t('common.loading')}</div>;
+    if (loading) {
+        return (
+            <div className="flex items-center justify-center h-[calc(100vh-theme(spacing.24))]">
+                <div className="text-center">
+                    <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600 mx-auto mb-4"></div>
+                    <p className="text-gray-500 font-medium">{t('common.loading')}</p>
+                </div>
+            </div>
+        );
+    }
 
     return (
         <div className="flex h-[calc(100vh-theme(spacing.24))] gap-6">

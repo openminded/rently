@@ -16,10 +16,9 @@ export const OpenShiftModal: React.FC<OpenShiftModalProps> = ({ isOpen, onClose 
     const [startCash, setStartCash] = useState('0');
     const [notes, setNotes] = useState('');
     const [submitting, setSubmitting] = useState(false);
+    const navigate = useNavigate();
 
     if (!isOpen) return null;
-
-    const navigate = useNavigate();
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
